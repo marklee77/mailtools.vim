@@ -49,22 +49,41 @@ function! BreakHeaderLine(lnum, maxwidth)
     return 1
 endfunction
 
-function! EmailFormatExpr()
+function! FormatHeaderBlock(lnum, lcount, maxwidth)
+endfunction
+
+function! EmailFormat()
     if mode() =~# '[iR]' && &formatoptions =~# 'a'
         return 1
-    endif
-    if empty(GetHeaderField(v:lnum))
+    elseif mode() !~# '[niR]' || (mode() =~# '[iR]' && v:count != 1) ||v:char =~# '\s'
+        echohl ErrorMsg
+        echomsg "Assert(formatexpr): Unknown State: " mode() v:lnum v:count string(v:char)
+        echohl None
         return 1
     endif
-    let maxwidth = 78
-    if &textwidth > 0
-        let maxwidth = &textwidth
+
+    if mode() == 'n'
+        let s:lnum = v:lnum
+        let s:count = v:count
+    else
+        let s:lnum = line('.')
+        let s:count = 1
     endif
-    call BreakHeaderLine(v:lnum, maxwidth)
+
+    if empty(GetHeaderField(s:lnum))
+        return 1
+    endif
+
+    let s:maxwidth = 78
+    if &textwidth > 0
+        let s:maxwidth = &textwidth
+    endif
+
+    call BreakHeaderLine(s:lnum, s:maxwidth)
     return 0 
 endfunction
 
-set formatexpr=EmailFormatExpr()
+set formatexpr=EmailFormat()
 
 nnoremap <silent> Q /^\(\s*>\)\@!<CR>
 onoremap <silent> Q V/^.*\n\(\s*>\)\@!<CR>
