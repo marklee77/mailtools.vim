@@ -1,13 +1,13 @@
 
-function! NumLinesToSig()
-    let cur_line = line('.')
-    let last_line = line('$')
-    let i = 0
-    while cur_line + i < last_line && getline(cur_line + i + 1) !~ '^--\s*$'
-        let i += 1
-    endwhile
-    return i + 1
-endfunction
+" function! NumLinesToSig()
+"    let cur_line = line('.')
+"    let last_line = line('$')
+"    let i = 0
+"    while cur_line + i < last_line && getline(cur_line + i + 1) !~ '^--\s*$'
+"        let i += 1
+"    endwhile
+"    return i + 1
+"endfunction
 
 function! GetHeaderField(lnum)
     let i = 1
@@ -25,16 +25,19 @@ function! GetHeaderField(lnum)
    return header
 endfunction
 
-" FIXME: break char is header dependent...
-function! BreakHeaderLine(linein, maxwidth)
+function! InHeader(lnum)
+    return ! empty(GetHeaderField(lnum)
+endfunction
+
+function! BreakHeaderLine(linein, maxwidth, pattern)
     if strlen(a:linein) <= a:maxwidth
         return [a:linein]
     endif
-    let breakpos = 0 
     let startpos = max([0, match(a:linein, ':')])
+    let breakpos = startpos
     while 0 <= startpos && startpos <= a:maxwidth
         let breakpos = startpos
-        let startpos = match(a:linein, ',', startpos + 1)
+        let startpos = match(a:linein, a:pattern, startpos + 1)
     endwhile
     if breakpos > 0
         let linesout = [a:linein[: breakpos]]
@@ -42,36 +45,66 @@ function! BreakHeaderLine(linein, maxwidth)
         if nextlinestart < 0
             return linesout
         endif
-        return linesout + BreakHeaderLine(' ' . a:linein[nextlinestart :], a:maxwidth)
+        return linesout + BreakHeaderLine(' ' . a:linein[nextlinestart :], a:maxwidth, a:pattern)
     endif
     return [a:linein]
 endfunction
 
+" FIXME: break char is header dependent...
 function! FormatHeaderBlock(lnum, lcount, maxwidth)
     let linesin = getline(a:lnum, a:lnum + a:lcount - 1) 
     let linesout = []
-    let currline = linesin[0]
-    let curridx = 1
-    while curridx < a:lcount
-        let h = matchstr(linesin[curridx], '^\zs[!-~][!-~]*\ze:')
-        if empty(h)
-            let currline .= linesin[curridx]
+    let currfield = linesin[0]
+    for currline in linesin[1 :]
+        if empty(matchstr(currline, '^\zs[!-~][!-~]*\ze:'))
+            let currfield .= currline
         else
-            let linesout += BreakHeaderLine(currline, a:maxwidth)
-            let currline = linesin[curridx]
+            let linesout += BreakHeaderLine(currfield, a:maxwidth, ',')
+            let currfield = currline
         endif
-        let curridx += 1
-    endwhile
-    let linesout += BreakHeaderLine(currline, a:maxwidth)
-    if len(linesin) == 1 && len(linesout) == 1 " FIXME: hack
-        return 0
+    endfor
+    let linesout += BreakHeaderLine(currfield, a:maxwidth, ',')
+    let lcountdiff = len(linesout) - a:lcount
+    if lcountdiff > 0
+        call append(a:lnum, repeat([""], lcountdiff))
+    elseif lcountdiff < 0
+        silent execute ':' . a:lnum . ',' . (a:lnum - lcountdiff - 1) . 'd'
     endif
-    exec ':' . a:lnum . ',' . (a:lnum + a:lcount - 1) . 'd'
-    call append(a:lnum - 1, linesout)
+    call setline(a:lnum, linesout)
     return 0
 endfunction
 
-function! EmailFormat()
+" FIXME: tab widths, or VCharWidth?
+function! CharWidth(char)
+    if empty(a:char)
+        return 0
+    endif
+    return 1
+endfunction
+
+" FIXME: handle variable width characters and tabs...
+function! FormatHeaderInsert(char, maxwidth)
+    let cnum = col('.')
+    let vcnum = cnum
+    let lnum = line('.')
+    let linein = getline(lnum)
+    let cwidth = CharWidth(a:char)
+    if len(linein) < a:maxwidth
+        return 0
+    endif
+    let linesout = BreakHeaderLine(linein[: cnum - 1] . a:char, a:maxwidth, ',')
+    let ncnum = len(linesout[-1]) - cwidth + 1
+    let nlnum = lnum + len(linesout) - 1
+    let linesout = linesout[:-2] + BreakHeaderLine(linesout[-1][: -1 - cwidth] . linein[cnum :], a:maxwidth, ',')
+    if len(linesout) > 1
+        call append(lnum, repeat([""], len(linesout) - 1))
+    endif
+    call setline(lnum, linesout)
+    call cursor(nlnum, ncnum)
+    return 0
+endfunction
+
+function! FormatEmailText()
 
     if mode() =~# '[iR]' && &formatoptions =~# 'a'
         return 1
@@ -83,7 +116,7 @@ function! EmailFormat()
     endif
 
     " only do special formatting for header...
-    if empty(GetHeaderField(s:lnum))
+    if ! InHeader(s:lnum)
         return 1
     endif
 
@@ -93,18 +126,14 @@ function! EmailFormat()
         let s:maxwidth = &textwidth
     endif
 
-    if mode() == 'n'
-        return FormatHeaderBlock(v:lnum, v:count, s:maxwidth)
+    if mode() =~# '[iR]'
+        return FormatHeaderInsert(v:char, s:maxwidth)
     endif
 
-    if v:char == ''
-        return FormatHeaderBlock(line('.'), 1, s:maxwidth)
-    endif
-
-    return 0 
+    return FormatHeaderBlock(v:lnum, v:count, s:maxwidth)
 endfunction
 
-set formatexpr=EmailFormat()
+set formatexpr=FormatEmailText()
 
 nnoremap <silent> Q /^\(\s*>\)\@!<CR>
 onoremap <silent> Q V/^.*\n\(\s*>\)\@!<CR>
