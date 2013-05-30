@@ -26,7 +26,7 @@ function! GetHeaderField(lnum)
 endfunction
 
 function! InHeader(lnum)
-    return ! empty(GetHeaderField(lnum)
+    return ! empty(GetHeaderField(a:lnum))
 endfunction
 
 function! BreakHeaderLine(linein, maxwidth, pattern)
@@ -115,11 +115,6 @@ function! FormatEmailText()
         return 1
     endif
 
-    " only do special formatting for header...
-    if ! InHeader(s:lnum)
-        return 1
-    endif
-
     " rfc says 78 characters max, but let user override...
     let s:maxwidth = 78
     if &textwidth > 0
@@ -127,7 +122,14 @@ function! FormatEmailText()
     endif
 
     if mode() =~# '[iR]'
+        if ! InHeader(line('.'))
+            return 1
+        endif
         return FormatHeaderInsert(v:char, s:maxwidth)
+    endif
+
+    if ! InHeader(v:lnum)
+        return 1
     endif
 
     return FormatHeaderBlock(v:lnum, v:count, s:maxwidth)
