@@ -65,9 +65,6 @@ function! ExtractQuotePrefix(linein)
    return matchstr(a:linein, '^[[:blank:]]*>[[:blank:]>]*') 
 endfunction
 
-" FIXME: need to add support for quote text...
-" need an inheader state variable...
-" ugh, loses emails...
 function! FormatEmailBlock(lnum, lcount, maxwidth)
 
     let linesin = getline(a:lnum, a:lnum + a:lcount - 1) 
@@ -169,11 +166,17 @@ function! FormatEmailInsert(char, maxwidth)
     let linesout = BreakLine(linein, a:maxwidth, breakbefore, prefix)
     if len(linesout) > 1 && cnum > len(linesout[0])
         let nlnum = lnum + 1
-        " if we've moved down to the second line, the new column is the same,
-        " minus the length of the first line, including any spaces that may have
-        " been stripped from the end.
-        " let spacesdeleted = len(linein) - len(linesout[0]) - len(linesout[1])
-        " let ncnum = cnum - len(linesout[0]) - spacesdeleted
+        " want: orig pos - length of orig line including spaces + spaces added
+        " to 2nd line -- cnum - len(linesout[0]) - spacesdeleted + spacesadded
+        "
+        " now len(linesout[0]) + len(linesout[1]) = len(linein) - spacesdeleted +
+        " spacesadded
+        "
+        " so  len(linesout[0]) + len(linesout[1]) - len(linein) = - spacesdelete
+        " + spaces added
+        "
+        " cnum - len(linesout[0]) + len(linesout[0]) + len(linesout[1] -
+        " len(linein)
         let ncnum = cnum + len(linesout[1]) - len(linein)
     endif
 
