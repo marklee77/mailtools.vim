@@ -76,27 +76,28 @@ function! FormatEmailBlock(lnum, lcount, maxwidth)
         let prefix = ' '
     endif
     for currline in linesin[1 :]
+
         let currfieldname = ExtractFieldName(currline)
-        if currline !~ '^\s*$' && (! inheader || empty(currfieldname))
+        if currline !~ '^\s*$' && ((! inheader) || empty(currfieldname))
+            " add a space if there isn't one already...
+            if currunit =~ '^.*[^\s]$' && currline =~ '^[^\s].*$'
+                let currunit .= ' '
+            endif
             let currunit .= currline
         else
 
             let linesout += BreakLine(currunit, a:maxwidth, breakbefore, startat, prefix)
 
-            if currline =~ '^\s*$' && ! inheader
-                let linesout += [""]
-            endif
-
-            if currline =~ '^\s*$' && inheader
-                inheader = 0
-                let currfieldname = ''
+            if inheader && currline =~ '^\s*$'
+                let inheader = 0
                 let prefix = ''
             endif
 
-            if inheader
-                let breakbefore = GetBreakBefore(currfieldname)
+            if currunit !~ '^\s*$' && currline =~ '^\s*$'
+                let linesout += [""]
             endif
 
+            let breakbefore = GetBreakBefore(currfieldname)
             let currunit = currline
 
         endif
