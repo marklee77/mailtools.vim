@@ -1,24 +1,46 @@
+" FIXME: long lines and scope
 
-" function! NumLinesToSig()
-"    let cur_line = line('.')
-"    let last_line = line('$')
-"    let i = 0
-"    while cur_line + i < last_line && getline(cur_line + i + 1) !~ '^--\s*$'
-"        let i += 1
-"    endwhile
-"    return i + 1
-"endfunction
+" This function breaks a string into an array of strings with specified maximum
+" width, breaking after the specified pattern, and prepending lines beyond the
+" first with the given prefix.  Blanks are stripped from the beginning of
+" subsequent lines, though support may be added for specifying a different
+" pattern for this in the future.
+function! BreakLine(linein, maxwidth, breakbefore, startat, prefix)
+    if strlen(a:linein) <= a:maxwidth
+        return [a:linein]
+    endif
+    let startpos = 0
+    let breakpos = 0
+    while 0 <= startpos && startpos <= a:maxwidth
+        let breakpos = startpos
+        let startpos = match(a:linein, a:breakbefore, startpos + 1)
+    endwhile
+    if breakpos > 0
+        let linesout = [a:linein[: breakpos - 1]]
+        let startpos = match(a:linein, a:startat, breakpos)
+        if startpos < 0
+            return linesout
+        endif
+        return linesout + BreakLine(a:prefix . a:linein[startpos :], a:maxwidth, a:breakbefore, a:startat, a:prefix)
+    endif
+    return [a:linein]
+endfunction
 
-" FIXME: regex isn't quite right...
-function! GetHeaderField(lnum)
+function! ExtractFieldName(linein)
+   return matchstr(a:linein, '^\zs[!-9;-~][!-9;-~]*\ze:') 
+endfunction
+
+function! FindFieldName(lnum)
     let i = 1
     let header = ''
     while i <= a:lnum
         let text = getline(i)
-        let h = matchstr(text, '^\zs[!-~][!-~]*:\ze')
+        let h = ExtractFieldName(text)
         if ! empty(h)
             let header = h
-        elseif text !~ '^\s.*$'
+        " if it's not a field line and doesn't start with one blank, we're out
+        " of the header
+        elseif text !~ '^\s.*$' 
             return ''
         endif
         let i += 1
@@ -27,63 +49,44 @@ function! GetHeaderField(lnum)
 endfunction
 
 function! InHeader(lnum)
-    return ! empty(GetHeaderField(a:lnum))
+    return ! empty(FindFieldName(a:lnum))
 endfunction
 
-" FIXME: comprehensive list, ignore case?
-function! HeaderBreakPattern(field)
-    if empty(a:field)
-        return ''
+function! GetBreakBefore(field)
+    if a:field =~? '^\(from\|reply-to\|to\|cc\|bcc\|resent-from\|resent-to\|resent-cc\|resent-bcc\)'
+        return ',\zs.\ze'
     endif
-    if matchstr(a:field, '^\zs[!-~][!-~]*\ze:') =~ '^\(To\|Cc\|Bcc\|From\|Reply-To\)'
-        return ','
-    endif
-    return '\s'
+    return ' '
 endfunction
 
-function! BreakHeaderLine(linein, maxwidth, pattern)
-    if strlen(a:linein) <= a:maxwidth
-        return [a:linein]
-    endif
-    let startpos = max([0, match(a:linein, ':')])
-    let breakpos = startpos
-    while 0 <= startpos && startpos <= a:maxwidth
-        let breakpos = startpos
-        let startpos = match(a:linein, a:pattern, startpos + 1)
-    endwhile
-    if breakpos > 0
-        let linesout = [a:linein[: breakpos]]
-        let nextlinestart = match(a:linein, '[^[:blank:]]', breakpos + 1)
-        if nextlinestart < 0
-            return linesout
-        endif
-        return linesout + BreakHeaderLine(' ' . a:linein[nextlinestart :], a:maxwidth, a:pattern)
-    endif
-    return [a:linein]
-endfunction
-
-" FIXME: break char is header dependent...
-" aaak...everything gets so complicated...
-" gotta get a new pattern for every field in the header...
-" also, what if block spans header?
-function! FormatHeaderBlock(lnum, lcount, maxwidth)
+" basically, there are three units: headers, body text, and quote text.
+" FIXME: need to add support for quote text...
+" need an inheader state variable...
+function! FormatEmailBlock(lnum, lcount, maxwidth)
     let linesin = getline(a:lnum, a:lnum + a:lcount - 1) 
     let linesout = []
-    let currfield = linesin[0]
-    let breakpattern = HeaderBreakPattern(GetHeaderField(a:lnum))
-    if empty(breakpattern)
-        return 1
+    let currunit = linesin[0]
+    let currfieldname = FindFieldName(a:lnum)
+    let breakbefore = GetBreakBefore(currfieldname)
+    let startat = '[^[:blank:]]'
+    let prefix = ''
+    if ! empty(currfieldname)
+        let prefix = ' '
     endif
     for currline in linesin[1 :]
-        if empty(matchstr(currline, '^\zs[!-~][!-~]*\ze:'))
-            let currfield .= currline
+        let currfieldname = ExtractFieldName(currline)
+        if currline !~ '^\s*$' && empty(currfieldname)
+            let currunit .= currline
         else
-            let linesout += BreakHeaderLine(currfield, a:maxwidth, breakpattern)
-            let currfield = currline
-            let breakpattern = HeaderBreakPattern(currfield)
+            let linesout += BreakLine(currunit, a:maxwidth, breakbefore, startat, prefix)
+            let currunit = currline
+            let breakbefore = GetBreakBefore(currfieldname)
+            if empty(currfieldname)
+                let prefix = ''
+            endif
         endif
     endfor
-    let linesout += BreakHeaderLine(currfield, a:maxwidth, breakpattern)
+    let linesout += BreakLine(currunit, a:maxwidth, breakbefore, startat, prefix)
     let lcountdiff = len(linesout) - a:lcount
     if lcountdiff > 0
         call append(a:lnum, repeat([""], lcountdiff))
@@ -104,7 +107,7 @@ endfunction
 
 " FIXME: handle variable width characters and tabs...
 " FIXME: doesn't handle it well if there is text after the cursor...
-function! FormatHeaderInsert(char, maxwidth)
+function! FormatEmailInsert(char, maxwidth)
     let cnum = col('.')
     let vcnum = cnum
     let lnum = line('.')
@@ -147,12 +150,23 @@ function! FormatEmailText()
     endif
 
     if mode() =~# '[iR]'
-        return FormatHeaderInsert(v:char, s:maxwidth)
+        return 1
+        "return FormatHeaderInsert(v:char, s:maxwidth)
     endif
 
-    return FormatHeaderBlock(v:lnum, v:count, s:maxwidth)
+    return FormatEmailBlock(v:lnum, v:count, s:maxwidth)
 
 endfunction
+
+" function! NumLinesToSig()
+"    let cur_line = line('.')
+"    let last_line = line('$')
+"    let i = 0
+"    while cur_line + i < last_line && getline(cur_line + i + 1) !~ '^--\s*$'
+"        let i += 1
+"    endwhile
+"    return i + 1
+"endfunction
 
 set formatexpr=FormatEmailText()
 
