@@ -1,4 +1,5 @@
 " FIXME: long lines, scope, configuration
+" FIXME: break line is hacky...
 
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
@@ -56,16 +57,17 @@ function! GetBreakBefore(field)
     if a:field =~? '^\(from\|reply-to\|to\|cc\|bcc\|resent-from\|resent-to\|resent-cc\|resent-bcc\)'
         return ',\zs.\ze'
     endif
-    return ' '
+    return '[[:blank:]][[:blank:]]*'
 endfunction
 
 " FIXME: configurable?
 function! ExtractQuotePrefix(linein)
-   return matchstr(a:linein, '^\s*>[[:blank:]>]*') 
+   return matchstr(a:linein, '^[[:blank:]]*>[[:blank:]>]*') 
 endfunction
 
 " FIXME: need to add support for quote text...
 " need an inheader state variable...
+" ugh, loses emails...
 function! FormatEmailBlock(lnum, lcount, maxwidth)
 
     let linesin = getline(a:lnum, a:lnum + a:lcount - 1) 
@@ -85,11 +87,10 @@ function! FormatEmailBlock(lnum, lcount, maxwidth)
             let nextfieldname = ExtractFieldName(nextline)
         endif
         if inheader && empty(nextfieldname)    
-            currunit .= nextline
+            let currunit .= nextline
         else
             let breakbefore = GetBreakBefore(currfieldname)
             let linesout += BreakLine(currunit, a:maxwidth, breakbefore, ' ')
-            
             let currunit = nextline
             let currfieldname = nextfieldname
         endif
@@ -102,17 +103,16 @@ function! FormatEmailBlock(lnum, lcount, maxwidth)
     endif
 
     let currquoteprefix = ExtractQuotePrefix(currunit)
+    let currunit = currunit[len(currquoteprefix) :]
 
     while nextlineidx < len(linesin)
         let nextline = linesin[nextlineidx]
         let nextquoteprefix = ExtractQuotePrefix(nextline)
         let nextline = nextline[len(nextquoteprefix) :]
-        if currquoteprefix =~ '^' . nextquoteprefix . '\s*$'
-            let currquoteprefix = nextquoteprefix
-        endif
-        if nextline =~ '^\s*$' || nextquoteprefix !~ '^' . currquoteprefix . '\s*$'
-            let linesout += BreakLine(currunit, a:maxwidth, '\s', currquoteprefix)
+        if nextline =~ '^\s*$' || nextquoteprefix !~ '^' . currquoteprefix . '[[:blank:]]*$'
+            let linesout += BreakLine(currquoteprefix . currunit, a:maxwidth, '[[:blank:]][[:blank:]]*', currquoteprefix)
             let currunit = nextline
+            let currquoteprefix = nextquoteprefix
         else
             if currunit =~ '^\s*$'
                 let linesout += [""] " don't clobber last space
@@ -120,13 +120,12 @@ function! FormatEmailBlock(lnum, lcount, maxwidth)
                 let currunit .= ' '
             endif
             let currunit .= nextline
-            let currquoteprefix = nextquoteprefix
         endif
         let nextlineidx += 1
     endfor
     
     if ! inheader
-        let linesout += BreakLine(currunit, a:maxwidth, '\s', currquoteprefix)
+        let linesout += BreakLine(currquoteprefix . currunit, a:maxwidth, '[[:blank:]][[:blank:]]*', currquoteprefix)
     endif
 
     let lcountdiff = len(linesout) - a:lcount
@@ -148,29 +147,42 @@ function! CharWidth(char)
 endfunction
 
 " FIXME: handle variable width characters and tabs...
-" FIXME: doesn't handle it well if there is text after the cursor...
 function! FormatEmailInsert(char, maxwidth)
     let cnum = col('.')
     let vcnum = cnum
     let lnum = line('.')
     let linein = getline(lnum)
     let cwidth = CharWidth(a:char)
-    let breakpattern = HeaderBreakPattern(GetHeaderField(lnum))
-    if empty(breakpattern)
+    if len(linein) + cwidth < a:maxwidth
         return 1
     endif
-    if len(linein) < a:maxwidth
-        return 0
+    let fieldname = FindFieldName(lnum)
+    if empty(fieldname)
+        return 1 " yeah, needs work...
+        let breakbefore = '[[:blank:]][[:blank:]]*'
+        let prefix = ''
+    else
+        let breakbefore = GetBreakBefore(fieldname)
+        let prefix = ' '
     endif
-    let linesout = BreakHeaderLine(linein[: cnum - 1] . a:char, a:maxwidth, breakpattern)
-    let ncnum = len(linesout[-1]) - cwidth + 1
-    let nlnum = lnum + len(linesout) - 1
-    let linesout = linesout[:-2] + BreakHeaderLine(linesout[-1][: -1 - cwidth] . linein[cnum :], a:maxwidth, breakpattern)
+
+    let linesout = BreakLine(linein, a:maxwidth, breakbefore, prefix)
+    if len(linesout) > 1 && cnum > len(linesout[0])
+        let nlnum = lnum + 1
+        " if we've moved down to the second line, the new column is the same,
+        " minus the length of the first line, including any spaces that may have
+        " been stripped from the end.
+        " let spacesdeleted = len(linein) - len(linesout[0]) - len(linesout[1])
+        " let ncnum = cnum - len(linesout[0]) - spacesdeleted
+        let ncnum = cnum + len(linesout[1]) - len(linein)
+    endif
+
     if len(linesout) > 1
         call append(lnum, repeat([""], len(linesout) - 1))
     endif
     call setline(lnum, linesout)
     call cursor(nlnum, ncnum)
+
     return 0
 endfunction
 
@@ -192,8 +204,7 @@ function! FormatEmailText()
     endif
 
     if mode() =~# '[iR]'
-        return 1
-        "return FormatHeaderInsert(v:char, s:maxwidth)
+        return FormatEmailInsert(v:char, s:maxwidth)
     endif
 
     return FormatEmailBlock(v:lnum, v:count, s:maxwidth)
