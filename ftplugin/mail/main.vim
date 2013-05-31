@@ -60,6 +60,7 @@ function! GetBreakBefore(field)
 endfunction
 
 " basically, there are three units: headers, body text, and quote text.
+" oh, also sig separator and sig...
 " FIXME: need to add support for quote text...
 " need an inheader state variable...
 function! FormatEmailBlock(lnum, lcount, maxwidth)
@@ -67,6 +68,7 @@ function! FormatEmailBlock(lnum, lcount, maxwidth)
     let linesout = []
     let currunit = linesin[0]
     let currfieldname = FindFieldName(a:lnum)
+    let inheader = ! empty(currfieldname)
     let breakbefore = GetBreakBefore(currfieldname)
     let startat = '[^[:blank:]]'
     let prefix = ''
@@ -75,15 +77,28 @@ function! FormatEmailBlock(lnum, lcount, maxwidth)
     endif
     for currline in linesin[1 :]
         let currfieldname = ExtractFieldName(currline)
-        if currline !~ '^\s*$' && empty(currfieldname)
+        if currline !~ '^\s*$' && (! inheader || empty(currfieldname))
             let currunit .= currline
         else
+
             let linesout += BreakLine(currunit, a:maxwidth, breakbefore, startat, prefix)
-            let currunit = currline
-            let breakbefore = GetBreakBefore(currfieldname)
-            if empty(currfieldname)
+
+            if currline =~ '^\s*$' && ! inheader
+                let linesout += [""]
+            endif
+
+            if currline =~ '^\s*$' && inheader
+                inheader = 0
+                let currfieldname = ''
                 let prefix = ''
             endif
+
+            if inheader
+                let breakbefore = GetBreakBefore(currfieldname)
+            endif
+
+            let currunit = currline
+
         endif
     endfor
     let linesout += BreakLine(currunit, a:maxwidth, breakbefore, startat, prefix)
