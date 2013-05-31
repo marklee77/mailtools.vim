@@ -1,11 +1,11 @@
-" FIXME: long lines and scope
+" FIXME: long lines, scope, configuration
 
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
 " first with the given prefix.  Blanks are stripped from the beginning of
 " subsequent lines, though support may be added for specifying a different
 " pattern for this in the future.
-function! BreakLine(linein, maxwidth, breakbefore, startat, prefix)
+function! BreakLine(linein, maxwidth, breakbefore, prefix)
     if strlen(a:linein) <= a:maxwidth
         return [a:linein]
     endif
@@ -17,11 +17,11 @@ function! BreakLine(linein, maxwidth, breakbefore, startat, prefix)
     endwhile
     if breakpos > 0
         let linesout = [a:linein[: breakpos - 1]]
-        let startpos = match(a:linein, a:startat, breakpos)
+        let startpos = match(a:linein, '[^[:blank:]]', breakpos)
         if startpos < 0
             return linesout
         endif
-        return linesout + BreakLine(a:prefix . a:linein[startpos :], a:maxwidth, a:breakbefore, a:startat, a:prefix)
+        return linesout + BreakLine(a:prefix . a:linein[startpos :], a:maxwidth, a:breakbefore, a:prefix)
     endif
     return [a:linein]
 endfunction
@@ -59,50 +59,76 @@ function! GetBreakBefore(field)
     return ' '
 endfunction
 
-" basically, there are three units: headers, body text, and quote text.
-" oh, also sig separator and sig...
+" FIXME: configurable?
+function! ExtractQuotePrefix(linein)
+   return matchstr(a:linein, '^\s*>[[:blank:]>]*') 
+endfunction
+
 " FIXME: need to add support for quote text...
 " need an inheader state variable...
 function! FormatEmailBlock(lnum, lcount, maxwidth)
+
     let linesin = getline(a:lnum, a:lnum + a:lcount - 1) 
     let linesout = []
+
     let currunit = linesin[0]
     let currfieldname = FindFieldName(a:lnum)
     let inheader = ! empty(currfieldname)
-    let breakbefore = GetBreakBefore(currfieldname)
-    let startat = '[^[:blank:]]'
-    let prefix = ''
-    if ! empty(currfieldname)
-        let prefix = ' '
-    endif
-    for currline in linesin[1 :]
 
-        let currfieldname = ExtractFieldName(currline)
-        if currline !~ '^\s*$' && ((! inheader) || empty(currfieldname))
-            " add a space if there isn't one already...
-            if currunit =~ '^.*[^\s]$' && currline =~ '^[^\s].*$'
+    let nextlineidx = 1
+
+    while inheader && nextlineidx < len(linesin)
+        let nextline = linesin[nextlineidx]
+        if nextline =~ '^\s*$'
+            let inheader = 0
+        else
+            let nextfieldname = ExtractFieldName(nextline)
+        endif
+        if inheader && empty(nextfieldname)    
+            currunit .= nextline
+        else
+            let breakbefore = GetBreakBefore(currfieldname)
+            let linesout += BreakLine(currunit, a:maxwidth, breakbefore, ' ')
+            
+            let currunit = nextline
+            let currfieldname = nextfieldname
+        endif
+        let nextlineidx += 1
+    endwhile
+
+    if inheader
+        let breakbefore = GetBreakBefore(currfieldname)
+        let linesout += BreakLine(currunit, a:maxwidth, breakbefore, ' ')
+    endif
+
+    let currquoteprefix = ExtractQuotePrefix(currunit)
+
+    while nextlineidx < len(linesin)
+        let nextline = linesin[nextlineidx]
+        let nextquoteprefix = ExtractQuotePrefix(nextline)
+        let nextline = nextline[len(nextquoteprefix) :]
+        if currquoteprefix =~ '^' . nextquoteprefix . '\s*$'
+            let currquoteprefix = nextquoteprefix
+        endif
+        if nextline =~ '^\s*$' || nextquoteprefix !~ '^' . currquoteprefix . '\s*$'
+            let linesout += BreakLine(currunit, a:maxwidth, '\s', currquoteprefix)
+            let currunit = nextline
+        else
+            if currunit =~ '^\s*$'
+                let linesout += [""] " don't clobber last space
+            elseif currunit =~ '^.*[^\s]$' && nextline =~ '^[^\s].*$'
                 let currunit .= ' '
             endif
-            let currunit .= currline
-        else
-
-            let linesout += BreakLine(currunit, a:maxwidth, breakbefore, startat, prefix)
-
-            if inheader && currline =~ '^\s*$'
-                let inheader = 0
-                let prefix = ''
-            endif
-
-            if currunit !~ '^\s*$' && currline =~ '^\s*$'
-                let linesout += [""]
-            endif
-
-            let breakbefore = GetBreakBefore(currfieldname)
-            let currunit = currline
-
+            let currunit .= nextline
+            let currquoteprefix = nextquoteprefix
         endif
+        let nextlineidx += 1
     endfor
-    let linesout += BreakLine(currunit, a:maxwidth, breakbefore, startat, prefix)
+    
+    if ! inheader
+        let linesout += BreakLine(currunit, a:maxwidth, '\s', currquoteprefix)
+    endif
+
     let lcountdiff = len(linesout) - a:lcount
     if lcountdiff > 0
         call append(a:lnum, repeat([""], lcountdiff))
@@ -192,7 +218,7 @@ nnoremap <silent> S /^.*\n--\s*\_$<CR>
 onoremap <silent> S V/^.*\n.*\n--\s*\_$<CR>
 
 set spell spelllang=en_us textwidth=78
-set omnifunc=QueryCommandComplete
 
 let g:gcc_pattern = '^\(To\|Cc\|Bcc\|Reply-To\):'
 let g:SuperTabDefaultCompletionType = "\<c-x>\<c-o>"
+set omnifunc=QueryCommandComplete
