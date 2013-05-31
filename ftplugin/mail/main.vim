@@ -9,12 +9,13 @@
 "    return i + 1
 "endfunction
 
+" FIXME: regex isn't quite right...
 function! GetHeaderField(lnum)
     let i = 1
     let header = ''
     while i <= a:lnum
         let text = getline(i)
-        let h = matchstr(text, '^\zs[!-~][!-~]*\ze:')
+        let h = matchstr(text, '^\zs[!-~][!-~]*:\ze')
         if ! empty(h)
             let header = h
         elseif text !~ '^\s.*$'
@@ -29,12 +30,12 @@ function! InHeader(lnum)
     return ! empty(GetHeaderField(a:lnum))
 endfunction
 
-function! HeaderBreakPattern(lnum)
-    let fieldname = GetHeaderField(a:lnum)
-    if empty(fieldname)
+" FIXME: comprehensive list, ignore case?
+function! HeaderBreakPattern(field)
+    if empty(a:field)
         return ''
     endif
-    if fieldname =~ '^\(To\|Cc\|Bcc\|From\|Reply-To\)'
+    if matchstr(a:field, '^\zs[!-~][!-~]*\ze:') =~ '^\(To\|Cc\|Bcc\|From\|Reply-To\)'
         return ','
     endif
     return '\s'
@@ -69,7 +70,8 @@ function! FormatHeaderBlock(lnum, lcount, maxwidth)
     let linesin = getline(a:lnum, a:lnum + a:lcount - 1) 
     let linesout = []
     let currfield = linesin[0]
-    if ! InHeader(a:lnum)
+    let breakpattern = HeaderBreakPattern(GetHeaderField(a:lnum))
+    if empty(breakpattern)
         return 1
     endif
     for currline in linesin[1 :]
@@ -78,6 +80,7 @@ function! FormatHeaderBlock(lnum, lcount, maxwidth)
         else
             let linesout += BreakHeaderLine(currfield, a:maxwidth, breakpattern)
             let currfield = currline
+            let breakpattern = HeaderBreakPattern(currfield)
         endif
     endfor
     let linesout += BreakHeaderLine(currfield, a:maxwidth, breakpattern)
@@ -107,7 +110,7 @@ function! FormatHeaderInsert(char, maxwidth)
     let lnum = line('.')
     let linein = getline(lnum)
     let cwidth = CharWidth(a:char)
-    let breakpattern = HeaderBreakPattern(lnum)
+    let breakpattern = HeaderBreakPattern(GetHeaderField(lnum))
     if empty(breakpattern)
         return 1
     endif
