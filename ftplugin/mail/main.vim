@@ -1,5 +1,5 @@
 " FIXME: long lines, scope, configuration
-" FIXME: break line is hacky...
+" FIXME: normalize regular expressions
 
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
@@ -47,10 +47,6 @@ function! FindFieldName(lnum)
         let i += 1
    endwhile
    return header
-endfunction
-
-function! InHeader(lnum)
-    return ! empty(FindFieldName(a:lnum))
 endfunction
 
 function! GetBreakBefore(field)
@@ -155,7 +151,7 @@ function! FormatEmailInsert(char, maxwidth)
     endif
     let fieldname = FindFieldName(lnum)
     if empty(fieldname)
-        return 1 " yeah, needs work...
+        return 1 " FIXME: not ready
         let breakbefore = '[[:blank:]][[:blank:]]*'
         let prefix = ''
     else
