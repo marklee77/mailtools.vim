@@ -1,4 +1,4 @@
-" FIXME: long lines, scope, configuration
+" FIXME: long lines,  configuration
 " FIXME: normalize regular expressions
 
 " This function breaks a string into an array of strings with specified maximum
@@ -20,29 +20,30 @@ function! s:BreakLine(linein, maxwidth, breakbefore, prefix)
     endwhile
     if breakpos > 0
         let linesout = [a:linein[: breakpos - 1]]
-        let startpos = match(a:linein, '[^[:blank:]]', breakpos)
+        let startpos = match(a:linein, '\m\S', breakpos)
         if startpos < 0
             return linesout
         endif
-        return linesout + s:BreakLine(a:prefix . a:linein[startpos :], a:maxwidth, a:breakbefore, a:prefix)
+        return linesout + s:BreakLine(a:prefix . a:linein[startpos :], 
+                                    \ a:maxwidth, a:breakbefore, a:prefix)
     endif
     return [a:linein]
 endfunction
 
 function! s:BreakHeaderField(linein, maxwidth, fieldname)
-    let breakbefore = '[[:blank:]][[:blank:]]*'
-    if a:fieldname =~? '^\(from\|reply-to\|to\|cc\|bcc\|resent-from\|resent-to\|resent-cc\|resent-bcc\)'
-        let breakbefore = ',\zs.\ze'
+    let breakbefore = '\m\s'
+    if a:fieldname =~# '\v^From|To|Cc|Bcc|Reply-To$'
+        let breakbefore = '\m,\zs.\ze'
     endif
     return s:BreakLine(a:linein, a:maxwidth, breakbefore, ' ')
 endfunction
 
 function! s:BreakParagraph(linein, maxwidth, prefix)
-    return s:BreakLine(a:prefix . a:linein, a:maxwidth, '[[:blank:]]', a:prefix)
+    return s:BreakLine(a:prefix . a:linein, a:maxwidth, '\m\s', a:prefix)
 endfunction
 
 function! s:ExtractFieldName(field)
-    return matchstr(a:field, '^\zs[!-9;-~][!-9;-~]*\ze:') 
+    return matchstr(a:field, '\m^\zs[!-9;-~][!-9;-~]*\ze:') 
 endfunction
 
 function! s:FindFieldName(lnum)
@@ -55,7 +56,7 @@ function! s:FindFieldName(lnum)
             let fieldname = currfieldname
         " if it's not a field line and doesn't start with one blank, we're out
         " of the header
-        elseif currline !~ '^\s.*$' 
+        elseif currline !~ '\m^\s.*$' 
             return ''
         endif
         let i += 1
@@ -65,7 +66,7 @@ endfunction
 
 " FIXME: configurable variables for quote char, tab stop width, minimum spacing?
 function! s:SeparatePrefix(linein)
-    let pos = match(a:linein, '^[>[:blank:]]*\zs[^>[:blank:]]\ze') 
+    let pos = match(a:linein, '\m^[> \t]*\zs[^> \t]\ze') 
     if pos < 0
         let prefixin = a:linein
         let lineout = ''
@@ -76,11 +77,11 @@ function! s:SeparatePrefix(linein)
         let prefixin = a:linein[: pos - 1]
         let lineout = a:linein[pos :]
     endif
-    let pos = match(prefixin, '>\|$')
+    let pos = match(prefixin, '\m>\|$')
     let prefixout = repeat(' ', (pos / 4) * 4)
     while pos < len(prefixin)
         let pos += 1
-        let newpos = match(prefixin, '>\|$', pos)
+        let newpos = match(prefixin, '\m>\|$', pos)
         let bcount = ((newpos - pos) / 4) * 4
         let prefixout .= '>' . repeat(' ', bcount)
         let pos = newpos
@@ -105,7 +106,7 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
 
         let nextline = linesin[i]
 
-        if nextline =~ '^[[:blank:]][[:blank:]]*[^[:blank:]]'
+        if nextline =~ '\m^\s\+\S'
             let currunit .= nextline
         else
             let linesout += s:BreakHeaderField(currunit, a:maxwidth, currfieldname)
@@ -124,17 +125,17 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
         let [currprefix, currunit] = s:SeparatePrefix(currunit)
         while i < len(linesin)
             let [nextprefix, nextline] = s:SeparatePrefix(linesin[i])
-            if nextline =~ '^--\s*$' " never spill over into signature...
+            if nextline =~ '\m^--\s*$' " never spill over into signature...
                 break
             endif
-            if nextline =~ '^\s*$' || nextprefix !=# currprefix
+            if nextline =~ '\m^\s*$' || nextprefix !=# currprefix
                 let linesout += s:BreakParagraph(currunit, a:maxwidth, currprefix)
                 let currunit = nextline
                 let currprefix = nextprefix
             else
-                if currunit =~ '^[[:blank:]]*$'
+                if currunit =~ '\m^\s*$'
                     let linesout += [currprefix] " don't clobber last space
-                elseif currunit =~ '[^[:blank:]]$' && nextline =~ '^[^[:blank:]]'
+                elseif currunit =~ '\S$' && nextline =~ '^\S'
                     let currunit .= ' '
                 endif
                 let currunit .= nextline
@@ -197,7 +198,7 @@ function! s:FormatEmailInsert(char, maxwidth)
     " FIXME: basically works, but ugly
     if len(linesout) > 1
         let nextline = getline(lnum+1)
-        if nextline !~ '^[[:blank:]]*$' && nextline !~ '^--[[:blank:]]*$'
+        if nextline !~ '\m^\s*$' && nextline !~ '\m^--\s*$'
             if ! empty(fieldname) 
                 if empty(ExtractFieldName(nextline)) && len(linesout[1]) + len(nextline) <= a:maxwidth
                     let linesout[1] .= nextline
@@ -207,7 +208,7 @@ function! s:FormatEmailInsert(char, maxwidth)
             else
                 let [nextprefix, nextline] = s:SeparatePrefix(nextline)
                 if nextprefix ==# prefix && len(linesout[1]) + len(nextline) <= a:maxwidth
-                    if linesout[1] =~ '[^[:blank:]]$' && nextline =~ '^[^[:blank:]]'
+                    if linesout[1] =~ '\m\S$' && nextline =~ '\m^\S'
                         let linesout[1] .= ' '
                     endif
                     let linesout[1] .= nextline
@@ -242,9 +243,9 @@ endfunction
 
 function! FormatEmailText()
 
-    if mode() =~# '[iR]' && &formatoptions =~# 'a'
+    if mode() =~# '\m[iR]' && &formatoptions =~# 'a'
         return 1
-    elseif mode() !~# '[niR]' || (mode() =~# '[iR]' && v:count != 1) ||v:char =~# '\s'
+    elseif mode() !~# '\m[niR]' || (mode() =~# '\m[iR]' && v:count != 1) ||v:char =~# '\m\s'
         echohl ErrorMsg
         echomsg "Assert(formatexpr): Unknown State: " mode() v:lnum v:count string(v:char)
         echohl None
@@ -257,7 +258,7 @@ function! FormatEmailText()
         let s:maxwidth = &textwidth
     endif
 
-    if mode() =~# '[iR]'
+    if mode() =~# '\m[iR]'
         return s:FormatEmailInsert(v:char, s:maxwidth)
     endif
 
