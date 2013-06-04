@@ -1,13 +1,10 @@
-" FIXME: long lines,  configuration
-" FIXME: normalize regular expressions
+" FIXME: long lines, configuration
 
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
 " first with the given prefix. Blanks are stripped from the beginning of
 " subsequent lines, though support may be added for specifying a different
 " pattern for this in the future.
-
-" FIXME: right strip text or start from right
 function! s:BreakLine(linein, maxwidth, breakbefore, prefix)
     if strlen(a:linein) <= a:maxwidth
         return [a:linein]
@@ -43,7 +40,7 @@ function! s:BreakParagraph(linein, maxwidth, prefix)
 endfunction
 
 function! s:ExtractFieldName(field)
-    return matchstr(a:field, '\m^\zs[!-9;-~][!-9;-~]*\ze:') 
+    return matchstr(a:field, '\m^\zs[!-9;-~]\+\ze:') 
 endfunction
 
 function! s:FindFieldName(lnum)
@@ -109,7 +106,8 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
         if nextline =~ '\m^\s\+\S'
             let currunit .= nextline
         else
-            let linesout += s:BreakHeaderField(currunit, a:maxwidth, currfieldname)
+            let linesout += 
+              \ s:BreakHeaderField(currunit, a:maxwidth, currfieldname)
             let currfieldname = s:ExtractFieldName(nextline)
             let currunit = nextline
         endif
@@ -129,7 +127,8 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
                 break
             endif
             if nextline =~ '\m^\s*$' || nextprefix !=# currprefix
-                let linesout += s:BreakParagraph(currunit, a:maxwidth, currprefix)
+                let linesout += 
+                  \ s:BreakParagraph(currunit, a:maxwidth, currprefix)
                 let currunit = nextline
                 let currprefix = nextprefix
             else
@@ -171,9 +170,9 @@ function! s:CharWidth(char)
     return 1
 endfunction
 
-" FIXME: handle variable width characters and tabs...
 " FIXME: adding a character to the prefix that causes an overflow can be a
 " problem....
+" TODO: handle variable width characters and tabs if there is demand for it
 function! s:FormatEmailInsert(char, maxwidth)
     let cnum = col('.')
     let vcnum = cnum
@@ -200,14 +199,16 @@ function! s:FormatEmailInsert(char, maxwidth)
         let nextline = getline(lnum+1)
         if nextline !~ '\m^\s*$' && nextline !~ '\m^--\s*$'
             if ! empty(fieldname) 
-                if empty(ExtractFieldName(nextline)) && len(linesout[1]) + len(nextline) <= a:maxwidth
+                if empty(ExtractFieldName(nextline)) && 
+                  \ len(linesout[1]) + len(nextline) <= a:maxwidth
                     let linesout[1] .= nextline
                 else
                     call append(lnum, repeat([""], len(linesout) - 1))
                 endif
             else
                 let [nextprefix, nextline] = s:SeparatePrefix(nextline)
-                if nextprefix ==# prefix && len(linesout[1]) + len(nextline) <= a:maxwidth
+                if nextprefix ==# prefix && 
+                  \ len(linesout[1]) + len(nextline) <= a:maxwidth
                     if linesout[1] =~ '\m\S$' && nextline =~ '\m^\S'
                         let linesout[1] .= ' '
                     endif
@@ -245,9 +246,11 @@ function! FormatEmailText()
 
     if mode() =~# '\m[iR]' && &formatoptions =~# 'a'
         return 1
-    elseif mode() !~# '\m[niR]' || (mode() =~# '\m[iR]' && v:count != 1) ||v:char =~# '\m\s'
+    elseif mode() !~# '\m[niR]' || (mode() =~# '\m[iR]' && v:count != 1) || 
+      \ v:char =~# '\m\s'
         echohl ErrorMsg
-        echomsg "Assert(formatexpr): Unknown State: " mode() v:lnum v:count string(v:char)
+        echomsg "Assert(formatexpr): Unknown State: " 
+          \ mode() v:lnum v:count string(v:char)
         echohl None
         return 1
     endif
