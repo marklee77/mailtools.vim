@@ -200,13 +200,30 @@ function! s:FormatEmailInsert(char, maxwidth)
     if empty(fieldname)
         let [prefix, linein] = s:SeparatePrefix(linein)
         let linesout = s:BreakParagraph(linein, a:maxwidth, prefix)
+        let j = 1
+        "while j <= len(linesout)
+        "   let [nextprefix, nextline] = s:SeparatePrefix(getline(lnum + j))
+        "   if prefix !=# prefix
+        "       break
+        "   endif
+        "   let lastline = linesout[j]
+        "   if lastline =~ '\S$' && nextline =~ '^\S'
+        "       let lastline .= ' '
+        "   endif
+        "   let lastline .= nextline
+        "   let linesout = linesout[: j - 1] + 
+        "     \ s:BreakParagraph(lastline, a:maxwidth, prefix)
+        "   let j += 1
+        "endwhile
+        if len(linesout) > j
+            call append(lnum, repeat([""], len(linesout) - 1))
+        endif
     else
         let linesout = s:BreakHeaderField(linein, a:maxwidth, fieldname)
-    endif
-
-    " FIXME: handle overflow by merging in block...
-    if len(linesout) > 1
-        call append(lnum, repeat([""], len(linesout) - 1))
+        " FIXME: handle overflow by merging in block...
+        if len(linesout) > 1
+            call append(lnum, repeat([""], len(linesout) - 1))
+        endif
     endif
 
     " find first \n to get new line and column numbers...
@@ -217,7 +234,7 @@ function! s:FormatEmailInsert(char, maxwidth)
         let i = match(linesout[j], "\n")
     endwhile
 
-    " remove marker...
+    " remove marker and inserted character...
     if j < len(linesout)
         let linesout[j] = substitute(linesout[j], a:char . "\n", '', 'g')
     endif
