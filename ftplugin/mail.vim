@@ -1,4 +1,5 @@
-" FIXME: long lines, configuration
+" TODO: configuration
+" FIXME: need virtual column support for accented chars
 
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
@@ -6,7 +7,9 @@
 " subsequent lines, though support may be added for specifying a different
 " pattern for this in the future.
 function! s:BreakLine(linein, maxwidth, breakbefore, prefix)
-    if strlen(a:linein) <= a:maxwidth
+    " ignore \n when calculating string length since this is used as the marker
+    " char for insert formatting..
+    if strlen(substitute(a:linein, "\n", '', 'g')) <= a:maxwidth 
         return [a:linein]
     endif
     let startpos = 0
@@ -40,7 +43,8 @@ function! s:BreakParagraph(linein, maxwidth, prefix)
 endfunction
 
 function! s:ExtractFieldName(field)
-    return matchstr(a:field, '\m^\zs[!-9;-~]\+\ze:') 
+    let field = substitute(a:field, "\n", '', 'g')
+    return matchstr(field, '\m^\zs[!-9;-~]\+\ze:') 
 endfunction
 
 function! s:FindFieldName(lnum)
@@ -61,9 +65,12 @@ function! s:FindFieldName(lnum)
     return fieldname
 endfunction
 
-" FIXME: configurable variables for quote char, tab stop width, minimum spacing?
+" TODO: configurable variables for quote char, tab stop width, minimum spacing?
 function! s:SeparatePrefix(linein)
-    let pos = match(a:linein, '\m^[> \t]*\zs[^> \t]\ze') 
+    " \n can be in the prefix initially, but we throw it away since if the user
+    " is in the prefix there shouldn't be any reason to update the cursor
+    " position
+    let pos = match(a:linein, '\m^[>[:blank:]\n]*\zs[^>[:blank:]\n]\ze') 
     if pos < 0
         let prefixin = a:linein
         let lineout = ''
@@ -74,6 +81,7 @@ function! s:SeparatePrefix(linein)
         let prefixin = a:linein[: pos - 1]
         let lineout = a:linein[pos :]
     endif
+    let prefixin = substitute(prefixin, "\n", '', 'g') " prefix shouldn't wrap
     let pos = match(prefixin, '\m>\|$')
     let prefixout = repeat(' ', (pos / 4) * 4)
     while pos < len(prefixin)
@@ -83,7 +91,7 @@ function! s:SeparatePrefix(linein)
         let prefixout .= '>' . repeat(' ', bcount)
         let pos = newpos
     endwhile
-    if ! empty(prefixout) && prefixout =~ '>$'
+    if ! empty(prefixout) && prefixout =~ '> *$'
         let prefixout .= ' '
     endif
     return [prefixout, lineout]
@@ -162,7 +170,7 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
 
 endfunction
 
-" FIXME: tab widths, or VCharWidth?
+" TODO: vcharwidth support wanted?
 function! s:CharWidth(char)
     if empty(a:char)
         return 0
@@ -172,21 +180,23 @@ endfunction
 
 " FIXME: adding a character to the prefix that causes an overflow can be a
 " problem....
-" TODO: handle variable width characters and tabs if there is demand for it
+" problem at end of line right now...
 function! s:FormatEmailInsert(char, maxwidth)
-    let cnum = col('.')
-    let vcnum = cnum
     let lnum = line('.')
     let linein = getline(lnum)
     let cwidth = s:CharWidth(a:char)
-    let marker = repeat("\n", cwidth) " \n should not appear in any strings...
+
     if len(linein) + cwidth < a:maxwidth
         return 0
     endif
 
-    " -2 because columns are 1 indexed AND cursor moves on before printing char
-    let linein = linein[: cnum - 2] . marker . linein[cnum - 1 :]
+    let cnum = col('.')
+    let vcnum = cnum
     let fieldname = s:FindFieldName(lnum)
+
+    " -2 because columns are 1 indexed AND cursor moves on before printing char
+    let linein = linein[: cnum - 2] . a:char . "\n" . linein[cnum - 1 :]
+
     if empty(fieldname)
         let [prefix, linein] = s:SeparatePrefix(linein)
         let linesout = s:BreakParagraph(linein, a:maxwidth, prefix)
@@ -194,48 +204,30 @@ function! s:FormatEmailInsert(char, maxwidth)
         let linesout = s:BreakHeaderField(linein, a:maxwidth, fieldname)
     endif
 
-    " FIXME: basically works, but ugly
+    " FIXME: handle overflow by merging in block...
     if len(linesout) > 1
-        let nextline = getline(lnum+1)
-        if nextline !~ '\m^\s*$' && nextline !~ '\m^--\s*$'
-            if ! empty(fieldname) 
-                if empty(ExtractFieldName(nextline)) && 
-                  \ len(linesout[1]) + len(nextline) <= a:maxwidth
-                    let linesout[1] .= nextline
-                else
-                    call append(lnum, repeat([""], len(linesout) - 1))
-                endif
-            else
-                let [nextprefix, nextline] = s:SeparatePrefix(nextline)
-                if nextprefix ==# prefix && 
-                  \ len(linesout[1]) + len(nextline) <= a:maxwidth
-                    if linesout[1] =~ '\m\S$' && nextline =~ '\m^\S'
-                        let linesout[1] .= ' '
-                    endif
-                    let linesout[1] .= nextline
-                else
-                    call append(lnum, repeat([""], len(linesout) - 1))
-                endif
-            endif
-        else
-            call append(lnum, repeat([""], len(linesout) - 1))
-        endif
+        call append(lnum, repeat([""], len(linesout) - 1))
     endif
 
-    if cwidth > 0
-        let i = -1
-        let j = -1
-        while i < 0 && j < len(linesout) 
-            let j += 1
-            let i = match(linesout[j], marker) 
-        endwhile
-        let linesout[j] = substitute(linesout[j], marker, '', '')
+    " find first \n to get new line and column numbers...
+    let i = -1
+    let j = -1
+    while i < 0 && j < len(linesout) 
+        let j += 1
+        let i = match(linesout[j], "\n")
+    endwhile
+
+    " remove marker...
+    if j < len(linesout)
+        let linesout[j] = substitute(linesout[j], a:char . "\n", '', 'g')
     endif
 
+    " data out
     call setline(lnum, linesout)
 
-    if cwidth > 0
-        call cursor(lnum + j, i + 1)
+    " move cursor if necessary
+    if i > -1
+        call cursor(lnum + j, i)
     endif
 
     return 0
