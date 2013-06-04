@@ -66,11 +66,12 @@ function! s:FindFieldName(lnum)
 endfunction
 
 " TODO: configurable variables for quote char, tab stop width, minimum spacing?
+" FIXME: check on changing prefix...
 function! s:SeparatePrefix(linein)
     " \n can be in the prefix initially, but we throw it away since if the user
     " is in the prefix there shouldn't be any reason to update the cursor
     " position
-    let pos = match(a:linein, '\m^[>[:blank:]\n]*\zs[^>[:blank:]\n]\ze') 
+    let pos = match(a:linein, '\m^[>[:blank:]]*\zs[^>[:blank:]]\ze') 
     if pos < 0
         let prefixin = a:linein
         let lineout = ''
@@ -81,7 +82,6 @@ function! s:SeparatePrefix(linein)
         let prefixin = a:linein[: pos - 1]
         let lineout = a:linein[pos :]
     endif
-    let prefixin = substitute(prefixin, "\n", '', 'g') " prefix shouldn't wrap
     let pos = match(prefixin, '\m>\|$')
     let prefixout = repeat(' ', (pos / 4) * 4)
     while pos < len(prefixin)
@@ -181,6 +181,7 @@ endfunction
 " FIXME: adding a character to the prefix that causes an overflow can be a
 " problem....
 " problem at end of line right now...
+" arrgh, text flow working, but now address insert is off...
 function! s:FormatEmailInsert(char, maxwidth)
     let lnum = line('.')
     let linein = getline(lnum)
@@ -194,29 +195,31 @@ function! s:FormatEmailInsert(char, maxwidth)
     let vcnum = cnum
     let fieldname = s:FindFieldName(lnum)
 
-    " -2 because columns are 1 indexed AND cursor moves on before printing char
-    let linein = linein[: cnum - 2] . a:char . "\n" . linein[cnum - 1 :]
+    let linetemp = a:char . "\n" . linein[cnum - 1 :]
+    if cnum > 1
+        let linetemp = linein[: cnum - 2] . linetemp
+    endif
 
     if empty(fieldname)
-        let [prefix, linein] = s:SeparatePrefix(linein)
+        let [prefix, linein] = s:SeparatePrefix(linetemp)
         let linesout = s:BreakParagraph(linein, a:maxwidth, prefix)
         let j = 1
-        "while j <= len(linesout)
-        "   let [nextprefix, nextline] = s:SeparatePrefix(getline(lnum + j))
-        "   if prefix !=# prefix
-        "       break
-        "   endif
-        "   let lastline = linesout[j]
-        "   if lastline =~ '\S$' && nextline =~ '^\S'
-        "       let lastline .= ' '
-        "   endif
-        "   let lastline .= nextline
-        "   let linesout = linesout[: j - 1] + 
-        "     \ s:BreakParagraph(lastline, a:maxwidth, prefix)
-        "   let j += 1
-        "endwhile
+        while j < len(linesout)
+            let [nextprefix, nextline] = s:SeparatePrefix(getline(lnum + j))
+            if nextline =~ '\m^\s*$' || nextprefix !=# prefix
+                break
+            endif
+            let lastline = linesout[j]
+            if lastline =~ '\m\S$' && nextline =~ '\m^\S'
+                let lastline .= ' '
+            endif
+            let lastline .= nextline
+            let linesout = linesout[: j - 1] + 
+              \ s:BreakParagraph(lastline, a:maxwidth, prefix)
+            let j += 1
+        endwhile
         if len(linesout) > j
-            call append(lnum, repeat([""], len(linesout) - 1))
+            call append(lnum, repeat([""], len(linesout) - j))
         endif
     else
         let linesout = s:BreakHeaderField(linein, a:maxwidth, fieldname)
@@ -233,18 +236,27 @@ function! s:FormatEmailInsert(char, maxwidth)
         let j += 1
         let i = match(linesout[j], "\n")
     endwhile
+    let nlnum = lnum + j
+    let ncnum = i
 
     " remove marker and inserted character...
     if j < len(linesout)
         let linesout[j] = substitute(linesout[j], a:char . "\n", '', 'g')
+        let j += 1
     endif
+    
+    " just remove \n so prefixes work...
+    while j < len(linesout)
+        let linesout[j] = substitute(linesout[j], "\n", '', 'g')
+        let j += 1
+    endwhile
 
     " data out
     call setline(lnum, linesout)
 
     " move cursor if necessary
     if i > -1
-        call cursor(lnum + j, i)
+        call cursor(nlnum, ncnum)
     endif
 
     return 0
