@@ -43,8 +43,8 @@ function! s:BreakParagraph(linein, maxwidth, prefix)
 endfunction
 
 function! s:ExtractFieldName(field)
-    let field = substitute(a:field, "\n", '', 'g')
-    return matchstr(field, '\m^\zs[!-9;-~]\+\ze:') 
+    let field = substitute(a:field, "\n", '', 'g') " ignore insert markers
+    return matchstr(field, '\m^\zs[!-9;-~]\+\ze:') " specified by rfc
 endfunction
 
 function! s:FindFieldName(lnum)
@@ -97,7 +97,6 @@ function! s:SeparatePrefix(linein)
     return [prefixout, lineout]
 endfunction
 
-" FIXME: some spaces being lost
 function! s:FormatEmailBlock(lnum, lcount, maxwidth)
 
     let linesin = getline(a:lnum, a:lnum + a:lcount - 1) 
@@ -178,9 +177,6 @@ function! s:CharWidth(char)
     return 1
 endfunction
 
-" FIXME: adding a character to the prefix that causes an overflow can be a
-" problem....
-" problem at end of line right now...
 function! s:FormatEmailInsert(char, maxwidth)
     let lnum = line('.')
     let linein = getline(lnum)
@@ -205,7 +201,7 @@ function! s:FormatEmailInsert(char, maxwidth)
         let linesout = s:BreakParagraph(linein, a:maxwidth, prefix)
         while j < len(linesout)
             let [nextprefix, nextline] = s:SeparatePrefix(getline(lnum + j))
-            if nextline =~ '\m^\s*$' || nextprefix !=# prefix
+            if nextline =~ '\m^\%(--\)\?\s*$' || nextprefix !=# prefix
                 break
             endif
             let lastline = linesout[j]
@@ -218,7 +214,6 @@ function! s:FormatEmailInsert(char, maxwidth)
             let j += 1
         endwhile
     else
-        " FIXME: buggy...
         let linesout = s:BreakHeaderField(linetemp, a:maxwidth, fieldname)
         while j < len(linesout)
             let nextline = getline(lnum + j)
