@@ -181,7 +181,6 @@ endfunction
 " FIXME: adding a character to the prefix that causes an overflow can be a
 " problem....
 " problem at end of line right now...
-" arrgh, text flow working, but now address insert is off...
 function! s:FormatEmailInsert(char, maxwidth)
     let lnum = line('.')
     let linein = getline(lnum)
@@ -200,10 +199,10 @@ function! s:FormatEmailInsert(char, maxwidth)
         let linetemp = linein[: cnum - 2] . linetemp
     endif
 
+    let j = 1
     if empty(fieldname)
         let [prefix, linein] = s:SeparatePrefix(linetemp)
         let linesout = s:BreakParagraph(linein, a:maxwidth, prefix)
-        let j = 1
         while j < len(linesout)
             let [nextprefix, nextline] = s:SeparatePrefix(getline(lnum + j))
             if nextline =~ '\m^\s*$' || nextprefix !=# prefix
@@ -218,15 +217,22 @@ function! s:FormatEmailInsert(char, maxwidth)
               \ s:BreakParagraph(lastline, a:maxwidth, prefix)
             let j += 1
         endwhile
-        if len(linesout) > j
-            call append(lnum, repeat([""], len(linesout) - j))
-        endif
     else
-        let linesout = s:BreakHeaderField(linein, a:maxwidth, fieldname)
-        " FIXME: handle overflow by merging in block...
-        if len(linesout) > 1
-            call append(lnum, repeat([""], len(linesout) - 1))
-        endif
+        " FIXME: buggy...
+        let linesout = s:BreakHeaderField(linetemp, a:maxwidth, fieldname)
+        while j < len(linesout)
+            let nextline = getline(lnum + j)
+            if nextline !~ '\m^\s\+\S'
+                break
+            endif
+            let lastline = linesout[j] . nextline
+            let linesout = linesout[: j - 1] + 
+              \ s:BreakHeaderField(lastline, a:maxwidth, fieldname)
+            let j += 1
+        endwhile
+    endif
+    if len(linesout) > j
+        call append(lnum, repeat([""], len(linesout) - j))
     endif
 
     " find first \n to get new line and column numbers...
