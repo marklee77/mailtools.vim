@@ -68,9 +68,6 @@ endfunction
 " TODO: configurable variables for quote char, tab stop width, minimum spacing?
 " FIXME: check on changing prefix...
 function! s:SeparatePrefix(linein)
-    " \n can be in the prefix initially, but we throw it away since if the user
-    " is in the prefix there shouldn't be any reason to update the cursor
-    " position
     let pos = match(a:linein, '\m^[>[:blank:]]*\zs[^>[:blank:]]\ze') 
     if pos < 0
         let prefixin = a:linein
