@@ -1,5 +1,4 @@
 " TODO: configuration
-" FIXME: need virtual column support for accented chars
 
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
@@ -282,43 +281,3 @@ function! FormatEmailText()
     return s:FormatEmailBlock(v:lnum, v:count, s:maxwidth)
 
 endfunction
-
-" function! NumLinesToSig()
-"    let cur_line = line('.')
-"    let last_line = line('$')
-"    let i = 0
-"    while cur_line + i < last_line && getline(cur_line + i + 1) !~ '^--\s*$'
-"        let i += 1
-"    endwhile
-"    return i + 1
-"endfunction
-
-set formatexpr=FormatEmailText()
-
-nnoremap <silent> Q /^\(\s*>\)\@!<CR>
-onoremap <silent> Q V/^.*\n\(\s*>\)\@!<CR>
-nnoremap <silent> S /^.*\n--\s*\_$<CR>
-onoremap <silent> S V/^.*\n.*\n--\s*\_$<CR>
-
-set spell spelllang=en_us textwidth=78
-
-" FIXME: move these to vimrc?
-let g:gcc_pattern = '^\(To\|Cc\|Bcc\|Reply-To\):'
-let b:SuperTabDisabled=0
-let g:SuperTabDefaultCompletionType = "\<c-x>\<c-o>"
-
-function! QueryWrapper(findstart, base)
-    let results = QueryCommandComplete(a:findstart, a:base)
-    if ! empty(results)
-        return results
-    endif
-    let entry = {}
-    let entry.word = "\t"
-    let entry.abbr = "\t"
-    let entry.menu = "\t"
-    let entry.icase = 1
-    return [entry]
-endfunction
-
-"set omnifunc=QueryCommandComplete
-"set omnifunc=QueryWrapper
