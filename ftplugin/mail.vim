@@ -9,7 +9,8 @@
 function! s:BreakLine(linein, maxwidth, breakbefore, prefix)
     " ignore \n when calculating string length since this is used as the marker
     " char for insert formatting..
-    if strlen(substitute(a:linein, "\n", '', 'g')) <= a:maxwidth 
+    if strlen(substitute(substitute(a:linein, "\n", '', 'g'), '.', 'x', 'g')) <=
+      \ a:maxwidth 
         return [a:linein]
     endif
     let startpos = 0
@@ -84,7 +85,7 @@ function! s:SeparatePrefix(linein)
     endif
     let pos = match(prefixin, '\m>\|$')
     let prefixout = repeat(' ', (pos / 4) * 4)
-    while pos < len(prefixin)
+    while pos < strlen(prefixin)
         let pos += 1
         let newpos = match(prefixin, '\m>\|$', pos)
         let bcount = ((newpos - pos) / 4) * 4
@@ -169,20 +170,11 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
 
 endfunction
 
-" TODO: vcharwidth support wanted?
-function! s:CharWidth(char)
-    if empty(a:char)
-        return 0
-    endif
-    return 1
-endfunction
-
 function! s:FormatEmailInsert(char, maxwidth)
     let lnum = line('.')
     let linein = getline(lnum)
-    let cwidth = s:CharWidth(a:char)
 
-    if len(linein) + cwidth < a:maxwidth
+    if strlen(substitute(linein, '.', 'x', 'g')) < a:maxwidth
         return 0
     endif
 
