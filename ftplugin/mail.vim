@@ -14,7 +14,7 @@ function! s:BreakLine(linein, maxwidth, breakbefore, prefix)
     endif
     let startpos = 0
     let breakpos = 0
-    while 0 <= startpos && startpos <= a:maxwidth
+    while 0 <= startpos && startpos < a:maxwidth
         let breakpos = startpos
         let startpos = match(a:linein, a:breakbefore, startpos + 1)
     endwhile
@@ -68,7 +68,7 @@ endfunction
 " TODO: configurable variables for quote char, tab stop width, minimum spacing?
 " FIXME: check on changing prefix...
 function! s:SeparatePrefix(linein)
-    let pos = match(a:linein, '\m^[>[:blank:]]*\zs[^>[:blank:]]\ze') 
+    let pos = match(a:linein, '\m^[>[:blank:]\n]*\zs[^>[:blank:]\n]\ze') 
     if pos < 0
         let prefixin = a:linein
         let lineout = ''
@@ -170,7 +170,7 @@ function! s:FormatEmailInsert(char, maxwidth)
     let lnum = line('.')
     let linein = getline(lnum)
 
-    if strlen(substitute(linein, '.', 'x', 'g')) < a:maxwidth
+    if strlen(substitute(linein, '.', 'x', 'g')) <= a:maxwidth
         return 0
     endif
 
@@ -189,7 +189,8 @@ function! s:FormatEmailInsert(char, maxwidth)
         let linesout = s:BreakParagraph(linein, a:maxwidth, prefix)
         while j < len(linesout)
             let [nextprefix, nextline] = s:SeparatePrefix(getline(lnum + j))
-            if nextline =~ '\m^\%(--\)\?\s*$' || nextprefix !=# prefix
+            if cnum > a:maxwidth || nextline =~ '\m^\%(--\)\?\s*$' || 
+              \ nextprefix !=# prefix
                 break
             endif
             let lastline = linesout[j]
