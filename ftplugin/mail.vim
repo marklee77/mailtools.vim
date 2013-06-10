@@ -1,4 +1,5 @@
 " TODO: configuration
+" TODO: make a proper plugin...
 
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
@@ -170,7 +171,7 @@ function! s:FormatEmailInsert(char, maxwidth)
     let lnum = line('.')
     let linein = getline(lnum)
 
-    if strlen(substitute(linein, '.', 'x', 'g')) <= a:maxwidth
+    if strlen(substitute(linein, '.', 'x', 'g')) < a:maxwidth
         return 0
     endif
 
@@ -231,7 +232,8 @@ function! s:FormatEmailInsert(char, maxwidth)
 
     " remove marker and inserted character...
     if j < len(linesout)
-        let linesout[j] = substitute(linesout[j], a:char . "\n", '', 'g')
+        let linesout[j] = substitute(linesout[j], 
+          \ escape(a:char, '*\^$.~[]') . "\n", '', 'g')
         let j += 1
     endif
     
