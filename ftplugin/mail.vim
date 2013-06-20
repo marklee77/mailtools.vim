@@ -228,7 +228,7 @@ function! s:FormatEmailInsert(char, maxwidth)
         let i = match(linesout[j], "\n")
     endwhile
     let nlnum = lnum + j
-    let ncnum = i
+    let ncnum = i + 1
 
     " remove marker and inserted character...
     if j < len(linesout)
