@@ -225,7 +225,7 @@ function! s:FormatEmailInsert(char, maxwidth)
     let j = -1
     while i < 0 && j < len(linesout) 
         let j += 1
-        let i = match(linesout[j], "\n")
+        let i = match(linesout[j], escape(a:char, '*\^$.~[]') . "\n")
     endwhile
     let nlnum = lnum + j
     let ncnum = i + 1
