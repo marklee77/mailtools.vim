@@ -1,6 +1,3 @@
-" TODO: configuration
-" TODO: make a proper plugin...
-
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
 " first with the given prefix. Blanks are stripped from the beginning of
@@ -257,9 +254,9 @@ endfunction
 
 function! FormatEmailText()
 
-    if mode() =~# '\m[iR]' && &formatoptions =~# 'a'
-        return 1
-    elseif mode() !~# '\m[niR]' || (mode() =~# '\m[iR]' && v:count != 1) || 
+    "if mode() =~# '\m[iR]' && &formatoptions =~# 'a'
+    "    return 1
+    if mode() !~# '\m[niR]' || (mode() =~# '\m[iR]' && v:count != 1) || 
       \ v:char =~# '\m\s'
         echohl ErrorMsg
         echomsg "Assert(formatexpr): Unknown State: " 
