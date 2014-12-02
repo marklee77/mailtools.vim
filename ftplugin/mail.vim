@@ -1,6 +1,3 @@
-" TODO: configuration
-" TODO: make a proper plugin...
-
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
 " first with the given prefix. Blanks are stripped from the beginning of
