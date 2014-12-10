@@ -17,7 +17,7 @@ function! s:BreakLine(linein, maxwidth, breakbefore, prefix)
         let startpos = match(a:linein, a:breakbefore, startpos + 1)
     endwhile
     if breakpos > 0
-        let linesout = [a:linein[: breakpos - 1] + ' ']
+        let linesout = [a:linein[: breakpos - 1] . ' ']
         let startpos = match(a:linein, '\m\S', breakpos)
         if startpos < 0
             return linesout
