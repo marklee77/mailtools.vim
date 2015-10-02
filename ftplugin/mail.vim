@@ -276,3 +276,45 @@ function! FormatEmailText()
     return s:FormatEmailBlock(v:lnum, v:count, s:maxwidth)
 
 endfunction
+
+function! FixFlowed()
+    let pos = getpos('.')
+
+    " compress quote characters
+    while search('^>\+\s\+>', 'w') > 0
+        silent! s/^>\+\zs\s\+>/>/
+    endwhile
+    silent! %s/^>\+\zs\([^[:space:]>]\)\@=/ /
+
+    " strip off trailing spaces
+    silent! %s/\s*$//
+
+    " put a space back after signature delimiter
+    silent! $?^--$?s/$/ /
+
+    " un-space stuff from
+    silent! 1/^$/;/^-- $/s/^\s\(\s*\)\zeFrom\_s/\1/
+    
+    " put spaces back at ends of lines in paragraph lines, where paragraph lines
+    " are defined as lines followed by lines with the same quote prefix (nothing
+    " or some number of > followed by a space) that starts with an optional
+    " opening punctuation mark, one of "*([{@~|>, that is immediately followed
+    " by a letter or digit.
+    silent! 1/^$/;/^-- $/s/\(>\+\s\|\).*\S\zs\(\_$\n\1["*(\[{@~|<]\=[0-9A-Za-z]\)\@=/ /
+
+    " space stuff from
+    silent! 1/^$/;/^-- $/s/^\(\s*\)\zeFrom\_s/ \1/
+
+    call setpos('.', pos)
+endfunction
+
+function! SetEmail(address, sigfile)
+    let pos = getpos('.')
+    call FixFlowed()
+    execute '1;/^$/s/^From:\zs.*/ ' . a:address . '/'
+    silent! /^-- /,$d
+    execute '$normal o-- '
+    execute 'r ' . a:sigfile
+    call setpos('.', pos)
+endfunction
+
