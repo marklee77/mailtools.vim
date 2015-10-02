@@ -63,8 +63,6 @@ function! s:FindFieldName(lnum)
     return fieldname
 endfunction
 
-" TODO: configurable variables for quote char, tab stop width, minimum spacing?
-" FIXME: check on changing prefix...
 function! s:SeparatePrefix(linein)
     let pos = match(a:linein, '\m^[>[:blank:]\n]*\zs[^>[:blank:]\n]\ze') 
     if pos < 0
