@@ -196,7 +196,7 @@ function! s:FormatEmailInsert(char, maxwidth)
                 let lastline .= ' '
             endif
             let lastline .= nextline
-            let linesout = linesout[: j - 1] + 
+            let linesout = linesout[: j - 2] + 
               \ s:BreakParagraph(lastline, a:maxwidth, prefix)
             let j += 1
         endwhile
