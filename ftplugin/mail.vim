@@ -280,6 +280,8 @@ endfunction
 function! FixFlowed()
     let pos = getpos('.')
 
+    " enforce one space after header names
+    
     " compress quote characters
     while search('^>\+\s\+>', 'w') > 0
         silent! s/^>\+\zs\s\+>/>/
