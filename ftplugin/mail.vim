@@ -277,11 +277,10 @@ function! FormatEmailText()
 
 endfunction
 
+" FIXME: convert to all 'magic' regexes...
 function! FixFlowed()
     let pos = getpos('.')
 
-    " enforce one space after header names
-    
     " compress quote characters
     while search('^>\+\s\+>', 'w') > 0
         silent! s/^>\+\zs\s\+>/>/
@@ -290,6 +289,9 @@ function! FixFlowed()
 
     " strip off trailing spaces
     silent! %s/\s*$//
+
+    " enforce one space after header names
+    silent! 1;/^$/s/^\w\+:\zs\s*\(\_S\)\@=/ /
 
     " put a space back after signature delimiter
     silent! $?^--$?s/$/ /
@@ -310,6 +312,7 @@ function! FixFlowed()
     call setpos('.', pos)
 endfunction
 
+" FIXME: convert to all 'magic' regexes...
 function! SetEmail(address, sigfile)
     let pos = getpos('.')
     call FixFlowed()
