@@ -301,10 +301,10 @@ function! FixFlowed()
     
     " put spaces back at ends of lines in paragraph lines, where paragraph lines
     " are defined as lines followed by lines with the same quote prefix (nothing
-    " or some number of > followed by a space) that starts with an optional
-    " opening punctuation mark, one of "*([{@~|>, that is immediately followed
-    " by a letter or digit.
-    silent! 1/^$/;/^-- $/s/\(>\+\s\|\).*\S\zs\(\_$\n\1["*(\[{@~|<]\=[0-9A-Za-z]\)\@=/ /
+    " or some number of > followed by a space) that starts with no more than 3
+    " spaces followed by an optional opening punctuation mark, one of "*([{@~|>,
+    " that is immediately followed by a letter or digit.
+    silent! 1/^$/;/^-- $/s/^\(>\+\s\|\).*\S\zs\(\_$\n\1 \{,3}["*(\[{@~|<]\=[0-9A-Za-z]\)\@=/ /
 
     " space stuff from
     silent! 1/^$/;/^-- $/s/^\(\s*\)\zeFrom\_s/ \1/
