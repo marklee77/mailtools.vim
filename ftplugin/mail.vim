@@ -252,8 +252,6 @@ endfunction
 
 function! FormatEmailText()
 
-    "if mode() =~# '\m[iR]' && &formatoptions =~# 'a'
-    "    return 1
     if mode() !~# '\m[niR]' || (mode() =~# '\m[iR]' && v:count != 1) || 
       \ v:char =~# '\m\s'
         echohl ErrorMsg
