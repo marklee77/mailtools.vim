@@ -162,7 +162,6 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
 
 endfunction
 
-" FIXME: take line num from v:lnum instead of line('.')?
 function! s:FormatEmailInsert(char, maxwidth)
     let lnum = line('.')
     let linein = getline(lnum)
@@ -186,9 +185,7 @@ function! s:FormatEmailInsert(char, maxwidth)
         let linesout = s:BreakBodyText(linein, a:maxwidth, prefix)
         while j < len(linesout)
             let [nextprefix, nextline] = s:SeparatePrefix(getline(lnum + j))
-            " FIXME: first test does not need to be done on every iteration...
-            if cnum > a:maxwidth || nextline =~ '\m^\%(--\)\=\s*$' || 
-              \ nextprefix !=# prefix
+            if nextline =~ '\m^\%(--\)\=\s*$' || nextprefix !=# prefix
                 break
             endif
             let lastline = linesout[j]
@@ -196,14 +193,11 @@ function! s:FormatEmailInsert(char, maxwidth)
                 let lastline .= ' '
             endif
             let lastline .= nextline
-            " FIXME: hmmm, what about breaking very long lines? need to merge
-            " remainder of array with last line of break body text call...
             let linesout = linesout[: j - 1] + 
               \ s:BreakBodyText(lastline, a:maxwidth, prefix)
             let j += 1
         endwhile
     else
-        " FIXME: check cnum as breakbody above?
         let linesout = s:BreakHeaderField(linetemp, a:maxwidth, fieldname)
         while j < len(linesout)
             let nextline = getline(lnum + j)
@@ -222,6 +216,8 @@ function! s:FormatEmailInsert(char, maxwidth)
         call append(lnum, repeat([""], len(linesout) - j))
     endif
 
+    " FIXME: for escapes use \V and only escape \
+    
     " find first \n to get new line and column numbers...
     let i = -1
     let j = -1
