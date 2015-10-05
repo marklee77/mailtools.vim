@@ -3,7 +3,7 @@
 " first with the given prefix. Blanks are stripped from the beginning of
 " subsequent lines, though support may be added for specifying a different
 " pattern for this in the future.
-function! s:BreakLine(linein, maxwidth, breakbefore, prefix)
+function! s:BreakLine(linein, maxwidth, breakafter, prefix)
     " ignore \n when calculating string length since this is used as the marker
     " char for insert formatting..
     if strlen(substitute(substitute(a:linein, "\n", '', 'g'), '.', 'x', 'g'))
@@ -14,26 +14,26 @@ function! s:BreakLine(linein, maxwidth, breakbefore, prefix)
     let breakpos = 0
     while 0 <= startpos && startpos < a:maxwidth
         let breakpos = startpos
-        let startpos = match(a:linein, a:breakbefore, startpos + 1)
+        let startpos = match(a:linein, a:breakafter, startpos + 1)
     endwhile
-    if breakpos > 0
-        let linesout = [a:linein[: breakpos - 1]]
-        let startpos = match(a:linein, '\m\S', breakpos)
+    if breakpos > -1
+        let linesout = [a:linein[: breakpos]]
+        let startpos = match(a:linein, '\m\S', breakpos + 1)
         if startpos < 0
             return linesout
         endif
         return linesout + s:BreakLine(a:prefix . a:linein[startpos :], 
-                                    \ a:maxwidth, a:breakbefore, a:prefix)
+                                    \ a:maxwidth, a:breakafter, a:prefix)
     endif
     return [a:linein]
 endfunction
 
 function! s:BreakHeaderField(linein, maxwidth, fieldname)
-    let breakbefore = '\m\s'
+    let breakafter = '\m\s'
     if a:fieldname =~# '\v^From|To|Cc|Bcc|Reply-To$'
-        let breakbefore = '\m,\zs.\ze'
+        let breakafter = '\m,'
     endif
-    return s:BreakLine(a:linein, a:maxwidth, breakbefore, ' ')
+    return s:BreakLine(a:linein, a:maxwidth, breakafter, ' ')
 endfunction
 
 function! s:BreakBodyText(linein, maxwidth, prefix)
@@ -216,6 +216,8 @@ function! s:FormatEmailInsert(char, maxwidth)
             let j += 1
         endwhile
     endif
+
+    " insert extra blank lines if needed
     if len(linesout) > j
         call append(lnum, repeat([""], len(linesout) - j))
     endif
@@ -225,7 +227,7 @@ function! s:FormatEmailInsert(char, maxwidth)
     let j = -1
     while i < 0 && j < len(linesout) 
         let j += 1
-        let i = match(linesout[j], escape(a:char, '*\^$.~[]') . "\n")
+        let i = match(linesout[j], '\m' . escape(a:char, '*\^$.~[]') . "\n")
     endwhile
     let nlnum = lnum + j
     let ncnum = i + 1
@@ -233,7 +235,7 @@ function! s:FormatEmailInsert(char, maxwidth)
     " remove marker and inserted character...
     if j < len(linesout)
         let linesout[j] = substitute(linesout[j], 
-          \ escape(a:char, '*\^$.~[]') . "\n", '', 'g')
+          \ '\m' . escape(a:char, '*\^$.~[]') . "\n", '', 'g')
         let j += 1
     endif
     
