@@ -275,47 +275,45 @@ function! FormatEmailText()
 
 endfunction
 
-" FIXME: convert to all 'magic' regexes...
 function! FixFlowed()
     let pos = getpos('.')
 
     " compress quote characters
     while search('^>\+\s\+>', 'w') > 0
-        silent! s/^>\+\zs\s\+>/>/
+        silent! s/\m^>\+\zs\s\+>/>/
     endwhile
-    silent! %s/^>\+\zs\([^[:space:]>]\)\@=/ /
+    silent! %s/\m^>\+\zs\%([^[:space:]>]\)\@=/ /
 
     " strip off trailing spaces
-    silent! %s/\s*$//
+    silent! %s/\m\s*$//
 
     " enforce one space after header names
-    silent! 1;/^$/s/^\w\+:\zs\s*\(\_S\)\@=/ /
+    silent! 1;/\m^$/s/\m^\w\+:\zs\s*\%(\_S\)\@=/ /
 
     " put a space back after signature delimiter
-    silent! $?^--$?s/$/ /
+    silent! $?\m^--$?s/$/ /
 
     " un-space stuff from
-    silent! 1/^$/;/^-- $/s/^\s\(\s*\)\zeFrom\_s/\1/
+    silent! 1/\m^$/;/\m^-- $/s/\m^\s\(\s*\)\zeFrom\_s/\1/
     
     " put spaces back at ends of lines in paragraph lines, where paragraph lines
     " are defined as lines followed by lines with the same quote prefix (nothing
     " or some number of > followed by a space) that starts with no more than 3
     " spaces followed by an optional opening punctuation mark, one of "*([{@~|>,
     " that is immediately followed by a letter or digit.
-    silent! 1/^$/;/^-- $/s/^\(>\+\s\|\).*\S\zs\(\_$\n\1 \{,3}["*(\[{@~|<]\=[0-9A-Za-z]\)\@=/ /
+    silent! 1/\m^$/;/\m^-- $/s/\m^\(>\+\s\|\).*\S\zs\%(\_$\n\1 \{,3}["*(\[{@~|<]\=[0-9A-Za-z]\)\@=/ /
 
     " space stuff from
-    silent! 1/^$/;/^-- $/s/^\(\s*\)\zeFrom\_s/ \1/
+    silent! 1/\m^$/;/\m^-- $/s/\m^\ze\s*From\_s/ /
 
     call setpos('.', pos)
 endfunction
 
-" FIXME: convert to all 'magic' regexes...
 function! SetEmail(address, sigfile)
     let pos = getpos('.')
     call FixFlowed()
-    execute '1;/^$/s/^From:\zs.*/ ' . a:address . '/'
-    silent! /^-- /,$d
+    execute '1;/\m^$/s/\m^From:\zs.*/ ' . a:address . '/'
+    silent! /\m^-- /,$d
     execute '$normal o-- '
     execute 'r ' . a:sigfile
     call setpos('.', pos)
