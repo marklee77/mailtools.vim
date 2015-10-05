@@ -4,15 +4,12 @@
 " subsequent lines, though support may be added for specifying a different
 " pattern for this in the future.
 function! s:BreakLine(linein, maxwidth, breakafter, prefix)
-    " ignore \n when calculating string length since this is used as the marker
-    " char for insert formatting..
-    if strlen(substitute(substitute(a:linein, "\n", '', 'g'), '.', 'x', 'g'))
-      \ <= a:maxwidth 
+    if strlen(substitute(a:linein, '.', 'x', 'g')) <= a:maxwidth
         return [a:linein]
     endif
     let startpos = 0
-    let breakpos = 0
-    while 0 <= startpos && startpos < a:maxwidth
+    let breakpos = -1
+    while 0 <= startpos && startpos <= a:maxwidth
         let breakpos = startpos
         let startpos = match(a:linein, a:breakafter, startpos + 1)
     endwhile
@@ -22,7 +19,7 @@ function! s:BreakLine(linein, maxwidth, breakafter, prefix)
         if startpos < 0
             return linesout
         endif
-        return linesout + s:BreakLine(a:prefix . a:linein[startpos :], 
+        return linesout + s:BreakLine(a:prefix . a:linein[startpos :],
                                     \ a:maxwidth, a:breakafter, a:prefix)
     endif
     return [a:linein]
@@ -41,8 +38,7 @@ function! s:BreakBodyText(linein, maxwidth, prefix)
 endfunction
 
 function! s:ExtractFieldName(field)
-    let field = substitute(a:field, "\n", '', 'g') " ignore insert markers
-    return matchstr(field, '\m^[!-9;-~]\+\ze:') " specified by rfc
+    return matchstr(a:field, '\m^[!-9;-~]\+\ze:') " specified by rfc
 endfunction
 
 function! s:FindFieldName(lnum)
@@ -55,7 +51,7 @@ function! s:FindFieldName(lnum)
             let fieldname = currfieldname
         " if it's not a field line and doesn't start with one blank, we're out
         " of the header
-        elseif currline !~ '\m^\s.*$' 
+        elseif currline !~# '\m^\s'
             return ''
         endif
         let i += 1
@@ -174,7 +170,7 @@ function! s:FormatEmailInsert(char, maxwidth)
     let vcnum = cnum
     let fieldname = s:FindFieldName(lnum)
 
-    let linetemp = a:char . "\n" . linein[cnum - 1 :]
+    let linetemp = "\n" . linein[cnum - 1 :]
     if cnum > 1
         let linetemp = linein[: cnum - 2] . linetemp
     endif
@@ -216,31 +212,22 @@ function! s:FormatEmailInsert(char, maxwidth)
         call append(lnum, repeat([""], len(linesout) - j))
     endif
 
-    " FIXME: for escapes use \V and only escape \
-    
-    " find first \n to get new line and column numbers...
+    " find \n to get new line and column numbers...
     let i = -1
     let j = -1
     while i < 0 && j < len(linesout) 
         let j += 1
-        let i = match(linesout[j], '\m' . escape(a:char, '*\^$.~[]') . "\n")
+        let i = match(linesout[j], '\m\n')
     endwhile
     let nlnum = lnum + j
     let ncnum = i + 1
 
-    " remove marker and inserted character...
+    " remove marker
     if j < len(linesout)
-        let linesout[j] = substitute(linesout[j], 
-          \ '\m' . escape(a:char, '*\^$.~[]') . "\n", '', 'g')
+        let linesout[j] = substitute(linesout[j], '\m\n', '', 'g')
         let j += 1
     endif
     
-    " just remove \n so prefixes work...
-    while j < len(linesout)
-        let linesout[j] = substitute(linesout[j], "\n", '', 'g')
-        let j += 1
-    endwhile
-
     " data out
     call setline(lnum, linesout)
 
