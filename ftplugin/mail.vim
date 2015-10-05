@@ -6,8 +6,8 @@
 function! s:BreakLine(linein, maxwidth, breakbefore, prefix)
     " ignore \n when calculating string length since this is used as the marker
     " char for insert formatting..
-    if strlen(substitute(substitute(a:linein, "\n", '', 'g'), '.', 'x', 'g')) <=
-      \ a:maxwidth 
+    if strlen(substitute(substitute(a:linein, "\n", '', 'g'), '.', 'x', 'g'))
+      \ <= a:maxwidth 
         return [a:linein]
     endif
     let startpos = 0
@@ -36,13 +36,13 @@ function! s:BreakHeaderField(linein, maxwidth, fieldname)
     return s:BreakLine(a:linein, a:maxwidth, breakbefore, ' ')
 endfunction
 
-function! s:BreakParagraph(linein, maxwidth, prefix)
+function! s:BreakBodyText(linein, maxwidth, prefix)
     return s:BreakLine(a:prefix . a:linein, a:maxwidth, '\m\s', a:prefix)
 endfunction
 
 function! s:ExtractFieldName(field)
     let field = substitute(a:field, "\n", '', 'g') " ignore insert markers
-    return matchstr(field, '\m^\zs[!A-Za-z0-9;-~]\+\ze:') " specified by rfc
+    return matchstr(field, '\m^[!-9;-~]\+\ze:') " specified by rfc
 endfunction
 
 function! s:FindFieldName(lnum)
@@ -64,7 +64,7 @@ function! s:FindFieldName(lnum)
 endfunction
 
 function! s:SeparatePrefix(linein)
-    let pos = match(a:linein, '\m^[>[:blank:]\n]*\zs[^>[:blank:]\n]\ze') 
+    let pos = match(a:linein, '\m^[>[:blank:]\n]*\zs[^>[:blank:]\n]') 
     if pos < 0
         let prefixin = a:linein
         let lineout = ''
@@ -128,7 +128,7 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
             endif
             if nextline =~ '\m^\s*$' || nextprefix !=# currprefix
                 let linesout += 
-                  \ s:BreakParagraph(currunit, a:maxwidth, currprefix)
+                  \ s:BreakBodyText(currunit, a:maxwidth, currprefix)
                 let currunit = nextline
                 let currprefix = nextprefix
             else
@@ -142,7 +142,7 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
             let i += 1
         endfor
 
-        let linesout += s:BreakParagraph(currunit, a:maxwidth, currprefix)
+        let linesout += s:BreakBodyText(currunit, a:maxwidth, currprefix)
 
         if i < len(linesin) " only here for signature...
             let linesout += linesin[i :]
@@ -162,6 +162,7 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
 
 endfunction
 
+" FIXME: take line num from v:lnum instead of line('.')?
 function! s:FormatEmailInsert(char, maxwidth)
     let lnum = line('.')
     let linein = getline(lnum)
@@ -182,10 +183,11 @@ function! s:FormatEmailInsert(char, maxwidth)
     let j = 1
     if empty(fieldname)
         let [prefix, linein] = s:SeparatePrefix(linetemp)
-        let linesout = s:BreakParagraph(linein, a:maxwidth, prefix)
+        let linesout = s:BreakBodyText(linein, a:maxwidth, prefix)
         while j < len(linesout)
             let [nextprefix, nextline] = s:SeparatePrefix(getline(lnum + j))
-            if cnum > a:maxwidth || nextline =~ '\m^\%(--\)\?\s*$' || 
+            " FIXME: first test does not need to be done on every iteration...
+            if cnum > a:maxwidth || nextline =~ '\m^\%(--\)\=\s*$' || 
               \ nextprefix !=# prefix
                 break
             endif
@@ -194,15 +196,18 @@ function! s:FormatEmailInsert(char, maxwidth)
                 let lastline .= ' '
             endif
             let lastline .= nextline
-            let linesout = linesout[: j - 2] + 
-              \ s:BreakParagraph(lastline, a:maxwidth, prefix)
+            " FIXME: hmmm, what about breaking very long lines? need to merge
+            " remainder of array with last line of break body text call...
+            let linesout = linesout[: j - 1] + 
+              \ s:BreakBodyText(lastline, a:maxwidth, prefix)
             let j += 1
         endwhile
     else
+        " FIXME: check cnum as breakbody above?
         let linesout = s:BreakHeaderField(linetemp, a:maxwidth, fieldname)
         while j < len(linesout)
             let nextline = getline(lnum + j)
-            if nextline !~ '\m^\s\+\S'
+            if nextline !~# '\m^\s\+\S'
                 break
             endif
             let lastline = linesout[j] . nextline
