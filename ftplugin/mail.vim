@@ -42,7 +42,7 @@ endfunction
 
 function! s:ExtractFieldName(field)
     let field = substitute(a:field, "\n", '', 'g') " ignore insert markers
-    return matchstr(field, '\m^\zs[!-9;-~]\+\ze:') " specified by rfc
+    return matchstr(field, '\m^\zs[!A-Za-z0-9;-~]\+\ze:') " specified by rfc
 endfunction
 
 function! s:FindFieldName(lnum)
