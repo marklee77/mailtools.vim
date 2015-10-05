@@ -9,14 +9,14 @@ function! s:BreakLine(linein, maxwidth, breakafter, prefix)
     endif
     let startpos = 0
     let breakpos = -1
-    while 0 <= startpos && startpos <= a:maxwidth
+    while 0 <= startpos && (breakpos <= 0 || startpos <= a:maxwidth)
         let breakpos = startpos
         let startpos = match(a:linein, a:breakafter, startpos + 1)
     endwhile
-    if breakpos > -1
+    if breakpos > 0
         let linesout = [a:linein[: breakpos]]
         let startpos = match(a:linein, '\m\S', breakpos + 1)
-        if startpos < 0
+        if startpos < breakpos + 1
             return linesout
         endif
         return linesout + s:BreakLine(a:prefix . a:linein[startpos :],
@@ -167,7 +167,6 @@ function! s:FormatEmailInsert(char, maxwidth)
     endif
 
     let cnum = col('.')
-    let vcnum = cnum
     let fieldname = s:FindFieldName(lnum)
 
     let linetemp = "\n" . linein[cnum - 1 :]
@@ -184,7 +183,7 @@ function! s:FormatEmailInsert(char, maxwidth)
             if nextline =~ '\m^\%(--\)\=\s*$' || nextprefix !=# prefix
                 break
             endif
-            let lastline = linesout[j]
+            let [lastprefix, lastline] = s:SeparatePrefix(linesout[j])
             if lastline =~ '\m\S$' && nextline =~ '\m^\S'
                 let lastline .= ' '
             endif
@@ -225,7 +224,6 @@ function! s:FormatEmailInsert(char, maxwidth)
     " remove marker
     if j < len(linesout)
         let linesout[j] = substitute(linesout[j], '\m\n', '', 'g')
-        let j += 1
     endif
     
     " data out
@@ -308,4 +306,3 @@ function! SetEmail(address, sigfile)
     execute 'r ' . a:sigfile
     call setpos('.', pos)
 endfunction
-
