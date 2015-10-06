@@ -59,31 +59,54 @@ function! s:FindFieldName(lnum)
     return fieldname
 endfunction
 
-" only round down if spaces less than 4, otherwise leave alone...
+" This is a little bit tricky, but basically go along and count >'s separated
+" only by whitespace to get the quote depth. If ever there are 4 or more
+" consecutive whitespace character then the text is pre-formatted, so anything
+" past the 4 spaces should be considered part of the line proper. Construct a
+" new prefix that is the quote depth consecutive > characters, followed by a
+" space if the quote depth is more than 0 to improve readability. Follow that
+" with four spaces if the text is pre-formatted. As an additional consideration,
+" if the quote depth is at least one, then pre-formatted text should be detected
+" if there are 4 or more spaces, but presented with 5 spaces to be consistent.
 function! s:SeparatePrefix(linein)
-    let pos = match(a:linein, '\m^[>[:blank:]\n]*\zs[^>[:blank:]\n]') 
-    if pos < 0
-        let prefixin = a:linein
-        let lineout = ''
-    elseif pos == 0
-        let prefixin = ''
-        let lineout = a:linein
-    else
-        let prefixin = a:linein[: pos - 1]
-        let lineout = a:linein[pos :]
-    endif
-    let pos = match(prefixin, '\m>\|$')
-    let prefixout = repeat(' ', (pos / 4) * 4)
-    while pos < strlen(prefixin)
-        let pos += 1
-        let newpos = match(prefixin, '\m>\|$', pos)
-        let bcount = ((newpos - pos) / 4) * 4
-        let prefixout .= '>' . repeat(' ', bcount)
-        let pos = newpos
+
+    let quotedepth = 0
+    let preformatted = 0
+    let prefixinlen = 0
+    
+    while prefixinlen < strlen(a:linein)
+        let pos = match(a:linein, '\m\s*\zs\S\|$', prefixinlen)
+        if pos == -1 
+            break
+        elseif pos - prefixinlen > 3
+            let prefixinlen += 4    
+            let preformatted = 1
+            break
+        elseif a:linein[pos] !=# '>'
+            let prefixinlen = pos
+            break
+        endif
+        let quotedepth += 1
+        let prefixinlen = pos + 1
     endwhile
-    if ! empty(prefixout) && prefixout =~ '> *$'
-        let prefixout .= ' '
+
+    if prefixinlen == 0
+        let prefixout = ''
+        let lineout   = a:linein
+    else
+        let prefixout = repeat('>', quotedepth)
+        if quotedepth
+            let prefixout .= ' '
+        endif
+        if preformatted
+            let prefixout .= '    '
+        endif
+        if quotedepth && preformatted && a:linein[prefixinlen] =~ '\m\s'
+            let prefixinlen += 1
+        endif
+        let lineout = a:linein[prefixinlen :]
     endif
+    
     return [prefixout, lineout]
 endfunction
 
