@@ -3,7 +3,7 @@
 " first with the given prefix. Blanks are stripped from the beginning of
 " subsequent lines, though support may be added for specifying a different
 " pattern for this in the future.
-function! s:BreakLine(linein, maxwidth, breakafter, prefix)
+function! s:BreakLine(linein, maxwidth, breakafter, minbreak, prefix)
     if strlen(substitute(a:linein, '.', 'x', 'g')) <= a:maxwidth
         return [a:linein]
     endif
@@ -13,14 +13,14 @@ function! s:BreakLine(linein, maxwidth, breakafter, prefix)
         let breakpos = startpos
         let startpos = match(a:linein, a:breakafter, startpos + 1)
     endwhile
-    if breakpos > 0
+    if breakpos > a:minbreak
         let linesout = [a:linein[: breakpos]]
         let startpos = match(a:linein, '\m\S', breakpos + 1)
         if startpos < breakpos + 1
             return linesout
         endif
         return linesout + s:BreakLine(a:prefix . a:linein[startpos :],
-                                    \ a:maxwidth, a:breakafter, a:prefix)
+                                    \ a:maxwidth, a:breakafter, a:minbreak, a:prefix)
     endif
     return [a:linein]
 endfunction
@@ -30,11 +30,11 @@ function! s:BreakHeaderField(linein, maxwidth, fieldname)
     if a:fieldname =~# '\v^From|To|Cc|Bcc|Reply-To$'
         let breakafter = '\m,'
     endif
-    return s:BreakLine(a:linein, a:maxwidth, breakafter, ' ')
+    return s:BreakLine(a:linein, a:maxwidth, breakafter, 2, ' ')
 endfunction
 
 function! s:BreakBodyText(linein, maxwidth, prefix)
-    return s:BreakLine(a:prefix . a:linein, a:maxwidth, '\m\s', a:prefix)
+    return s:BreakLine(a:prefix . a:linein, a:maxwidth, '\m\s', strlen(a:prefix), a:prefix)
 endfunction
 
 function! s:ExtractFieldName(field)
@@ -59,6 +59,7 @@ function! s:FindFieldName(lnum)
     return fieldname
 endfunction
 
+" only round down if spaces less than 4, otherwise leave alone...
 function! s:SeparatePrefix(linein)
     let pos = match(a:linein, '\m^[>[:blank:]\n]*\zs[^>[:blank:]\n]') 
     if pos < 0
@@ -115,7 +116,6 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
     if ! empty(currfieldname)
         let linesout += s:BreakHeaderField(currunit, a:maxwidth, currfieldname)
     else
-
         let [currprefix, currunit] = s:SeparatePrefix(currunit)
         while i < len(linesin)
             let [nextprefix, nextline] = s:SeparatePrefix(linesin[i])
@@ -139,7 +139,7 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
         endfor
 
         let linesout += s:BreakBodyText(currunit, a:maxwidth, currprefix)
-
+        
         if i < len(linesin) " only here for signature...
             let linesout += linesin[i :]
         endif
@@ -289,6 +289,8 @@ function! FixFlowed()
     " or some number of > followed by a space) that starts with no more than 3
     " spaces followed by an optional opening punctuation mark, one of "*([{@~|>,
     " that is immediately followed by a letter or digit.
+    " FIXME: should need \w character somewhere on both lines? Star boxes,
+    " rules, markdown headers...
     silent! 1/\m^$/;/\m^-- $/s/\m^\(>\+\s\|\).*\S\zs\%(\_$\n\1 \{,3}["*(\[{@~|<]\=[0-9A-Za-z]\)\@=/ /
 
     " space stuff from
