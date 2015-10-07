@@ -9,11 +9,14 @@ function! s:BreakLine(linein, maxwidth, breakafter, minbreak, prefix)
     endif
     let startpos = 0
     let breakpos = -1
-    while 0 <= startpos && (breakpos < a:minbreak || startpos <= a:maxwidth)
+    while 0 <= startpos && startpos < a:maxwidth
         let breakpos = startpos
         let startpos = match(a:linein, a:breakafter, startpos + 1)
     endwhile
-    if breakpos >= a:minbreak
+    if breakpos < a:minbreak
+        let breakpos = startpos
+    endif
+    if breakpos > 0
         let linesout = [a:linein[: breakpos]]
         let startpos = match(a:linein, '\m\S', breakpos + 1)
         if startpos < breakpos + 1
