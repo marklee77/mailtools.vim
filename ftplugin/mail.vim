@@ -62,6 +62,11 @@ function! s:FindFieldName(lnum)
     return fieldname
 endfunction
 
+function! GetFieldName()
+    let lnum = line('.')
+    return s:FindFieldName(lnum)
+endfunction
+
 " This is a little bit tricky, but basically go along and count >'s separated
 " only by whitespace to get the quote depth. If ever there are 4 or more
 " consecutive whitespace character then the text is pre-formatted, so anything
