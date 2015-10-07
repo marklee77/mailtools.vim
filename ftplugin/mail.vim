@@ -118,6 +118,7 @@ function! s:SeparatePrefix(linein)
     return [prefixout, lineout]
 endfunction
 
+" FIXME: normalize and document format functions...
 function! s:FormatEmailBlock(lnum, lcount, maxwidth)
 
     let linesin = getline(a:lnum, a:lnum + a:lcount - 1) 
@@ -153,15 +154,14 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
             if nextline =~ '\m^--\s*$' " never spill over into signature...
                 break
             endif
-            if nextline =~ '\m^\s*$' || nextprefix !=# currprefix
+            if nextprefix !=# currprefix || nextline =~ '\v^%(\s*$)|%(---)|%(\=\=\=)|%(\*\*\*)|%(\~\~\~)|%([*\-]\s)' || 
+                                          \ currunit =~ '\v^%(\s*$)|%(---)|%(\=\=\=)|%(\*\*\*)|%(\~\~\~)|%([*\-]\s)'
                 let linesout += 
                   \ s:BreakBodyText(currunit, a:maxwidth, currprefix)
                 let currunit = nextline
                 let currprefix = nextprefix
             else
-                if currunit =~ '\m^\s*$'
-                    let linesout += [currprefix] " don't clobber last space
-                elseif currunit =~ '\S$' && nextline =~ '^\S'
+                if currunit =~ '\S$' && nextline =~ '^\S'
                     let currunit .= ' '
                 endif
                 let currunit .= nextline
