@@ -156,7 +156,7 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
         let [currprefix, currunit] = s:SeparatePrefix(currunit)
         while i < len(linesin)
             let [nextprefix, nextline] = s:SeparatePrefix(linesin[i])
-            if nextline =~ '\m^\%(--\)\=\s*$' " never spill over into signature...
+            if nextline =~ '\m^--\s\+$' " never spill over into signature...
                 break
             endif
             if nextprefix !=# currprefix || 
@@ -217,7 +217,7 @@ function! s:FormatEmailInsert(char, maxwidth)
         let linesout = s:BreakBodyText(linein, a:maxwidth, prefix)
         while j < len(linesout)
             let [nextprefix, nextline] = s:SeparatePrefix(getline(lnum + j))
-            if nextprefix !=# prefix || nextline =~ '\m^\%(--\)\=\s*$' || 
+            if nextprefix !=# prefix || nextline =~ '\m^--\s\+$' || 
              \ nextline =~ '\v^%(\s*$)|%(---)|%(\=\=\=)|%(\*\*\*)|%(\~\~\~)|%([*\-]\s)'
                 break
             endif
