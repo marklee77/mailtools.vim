@@ -1,3 +1,7 @@
+" FIXME: format block and format insert have a lot of common algorithms, but are
+"        slightly different. Can they be unified to make them easier to keep in
+"        sync?
+
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
 " first with the given prefix. Blanks are stripped from the beginning of
@@ -118,9 +122,7 @@ function! s:SeparatePrefix(linein)
     return [prefixout, lineout]
 endfunction
 
-" FIXME: normalize and document format functions...
 function! s:FormatEmailBlock(lnum, lcount, maxwidth)
-
     let linesin = getline(a:lnum, a:lnum + a:lcount - 1) 
     let linesout = []
 
@@ -133,7 +135,10 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
         let nextline = linesin[i]
 
         if nextline =~ '\m^\s\+\S'
-            let currunit .= nextline
+            if currunit =~ '\m\S$'
+              let currunit .= ' '
+            endif
+            let currunit .= nextline[1:]
         else
             let linesout += 
               \ s:BreakHeaderField(currunit, a:maxwidth, currfieldname)
@@ -151,17 +156,18 @@ function! s:FormatEmailBlock(lnum, lcount, maxwidth)
         let [currprefix, currunit] = s:SeparatePrefix(currunit)
         while i < len(linesin)
             let [nextprefix, nextline] = s:SeparatePrefix(linesin[i])
-            if nextline =~ '\m^--\s*$' " never spill over into signature...
+            if nextline =~ '\m^\%(--\)\=\s*$' " never spill over into signature...
                 break
             endif
-            if nextprefix !=# currprefix || nextline =~ '\v^%(\s*$)|%(---)|%(\=\=\=)|%(\*\*\*)|%(\~\~\~)|%([*\-]\s)' || 
-                                          \ currunit =~ '\v^%(\s*$)|%(---)|%(\=\=\=)|%(\*\*\*)|%(\~\~\~)|%([*\-]\s)'
+            if nextprefix !=# currprefix || 
+             \ nextline =~ '\v^%(\s*$)|%(---)|%(\=\=\=)|%(\*\*\*)|%(\~\~\~)|%([*\-]\s)' ||
+             \ currunit =~ '\v^%(\s*$)|%(---)|%(\=\=\=)|%(\*\*\*)|%(\~\~\~)|%([*\-]\s)'
                 let linesout += 
                   \ s:BreakBodyText(currunit, a:maxwidth, currprefix)
                 let currunit = nextline
                 let currprefix = nextprefix
             else
-                if currunit =~ '\S$' && nextline =~ '^\S'
+                if currunit =~ '\m\S$' && nextline =~ '\m^\S'
                     let currunit .= ' '
                 endif
                 let currunit .= nextline
@@ -211,7 +217,8 @@ function! s:FormatEmailInsert(char, maxwidth)
         let linesout = s:BreakBodyText(linein, a:maxwidth, prefix)
         while j < len(linesout)
             let [nextprefix, nextline] = s:SeparatePrefix(getline(lnum + j))
-            if nextline =~ '\m^\%(--\)\=\s*$' || nextprefix !=# prefix
+            if nextprefix !=# prefix || nextline =~ '\m^\%(--\)\=\s*$' || 
+             \ nextline =~ '\v^%(\s*$)|%(---)|%(\=\=\=)|%(\*\*\*)|%(\~\~\~)|%([*\-]\s)'
                 break
             endif
             let [lastprefix, lastline] = s:SeparatePrefix(linesout[j])
@@ -230,7 +237,10 @@ function! s:FormatEmailInsert(char, maxwidth)
             if nextline !~# '\m^\s\+\S'
                 break
             endif
-            let lastline = linesout[j] . nextline
+            if linesout[j] =~ '\m\S$'
+                let linesout[j] .= ' '
+            endif
+            let lastline = linesout[j] . nextline[1:]
             let linesout = linesout[: j - 1] + 
               \ s:BreakHeaderField(lastline, a:maxwidth, fieldname)
             let j += 1
@@ -254,7 +264,7 @@ function! s:FormatEmailInsert(char, maxwidth)
 
     " remove marker
     if j < len(linesout)
-        let linesout[j] = substitute(linesout[j], '\m\n', '', 'g')
+        let linesout[j] = substitute(linesout[j], '\n', '', 'g')
     endif
     
     " data out
@@ -304,6 +314,9 @@ function! FixFlowed()
 
     " enforce one space after header names
     silent! 1;/\m^$/s/\m^\w\+:\zs\s*\%(\_S\)\@=/ /
+
+    " header lines should end with a space if they flow into the next line
+    silent! 1;/\m^$/s/\m\S\zs\%(\_$\n \)\@=/ /
 
     " put a space back after signature delimiter
     silent! $?\m^--$?s/$/ /
