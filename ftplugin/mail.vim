@@ -1,6 +1,5 @@
 " FIXME: format block and format insert have a lot of common algorithms, but are
-"        slightly different. Can they be unified to make them easier to keep in
-"        sync?
+" slightly different. Can they be unified to make them easier to keep in sync?
 
 " This function breaks a string into an array of strings with specified maximum
 " width, breaking after the specified pattern, and prepending lines beyond the
