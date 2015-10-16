@@ -335,7 +335,7 @@ function! FixFlowed()
     " a space) that starts with no more than 3 spaces followed by an optional
     " opening punctuation mark, one of "*([{@~|>, that is immediately followed
     " by a letter or digit.
-    silent! 1/\m^$/;/\m^-- $/s/\m^\(>\+\s\|\).*\a\{2,}.*\S\zs\%(\_$\n\1 \{,3}["*(\[{@~|<]\=[0-9A-Za-z]\)\@=/ /
+    silent! 1/\m^$/;/\m^-- $/s/\m^\(>\+\s\|\) \{,3}\S*\a\{2,}.*\S\zs\%(\_$\n\1 \{,3}["*(\[{@~|<]\=[0-9A-Za-z]\)\@=/ /
 
     " space stuff from
     silent! 1/\m^$/;/\m^-- $/s/\m^\ze\s*From\_s/ /
