@@ -22,4 +22,3 @@ To enable, make sure that the filetype plugin is enabled and put the following
 in your .vimrc:
 
     autocmd FileType mail set formatexpr=FormatEmailText()
-
