@@ -317,6 +317,9 @@ function! FixFlowed()
     " header lines should end with a space if they flow into the next line
     silent! 1;/\m^$/s/\m\S\zs\%(\_$\n \)\@=/ /
 
+    " escape spaces in filenames in attach pseudo-header
+    silent! 1;/\m^$/s/\m^Attach: \zs\(.*\)$/\=substitute(submatch(0), '\m\\\@<!\ze\s', '\\', 'g')/
+
     " put a space back after signature delimiter
     silent! $?\m^--$?s/$/ /
 
